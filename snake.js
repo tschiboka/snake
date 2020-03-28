@@ -5,11 +5,15 @@ const app = {
     $intro: $(".intro"),
     $mainMenu: $(".main-menu"),
     $gameBox: $(".game-box"),
+    $control: $(".game-box__control"),
     // APP VARS
     introDuration: 1,
     loadLevelsState: "pending",
     currentLevel: 1,
     level: undefined,
+    keyboard: false,
+    gameTablePadding: 10,
+    gameTableCellLength: 20,
 };
 
 const level = {};
@@ -86,6 +90,8 @@ function startGame() {
 function startLevel() {
     app.$mainMenu.style.display = "none";
     app.$gameBox.style.display = "flex";
+    if (app.keyboard) { app.$control.style.display = "none"; }
+    console.log(app.$control);
 
     // assign current level to app obj
     app.level = app.levels[app.currentLevel - 1];
@@ -96,14 +102,21 @@ function startLevel() {
 
 
 function buildTable() {
-    const maxDisplayableRows = Math.floor((window.innerHeight - 20 - (window.innerHeight / 10)) / 20);
-    const maxDisplayableCols = Math.floor((window.innerWidth - 20) / 20);
-
+    const height = window.innerHeight;
+    const width = window.innerWidth;
+    const gameHeight = height - (app.gameTablePadding * 2);
+    const gameWidth = width - (app.gameTablePadding * 2);
+    const navSpace = app.keyboard ? gameHeight * 0.1 : gameHeight * 0.2; // space for displaying points and navigation etc.
+    const maxDisplayableRows = Math.floor((gameHeight - navSpace) / app.gameTableCellLength);
+    const maxDisplayableCols = Math.floor(gameWidth / app.gameTableCellLength);
     const rowNum = app.level.dimension[1] <= maxDisplayableRows ? app.level.dimension[1] : maxDisplayableRows;
     const colNum = app.level.dimension[0] <= maxDisplayableCols ? app.level.dimension[0] : maxDisplayableCols;
-
-    // build table
     const table = document.createElement("table");
+
+    $(".game-box__stats, .game-box__control", true).map(elem => elem.style.height = Math.floor(gameHeight / 10) + "px");
+
+    console.log(rowNum, colNum);
+    // build table
     table.classList.add("game-table");
     for (let row = 0; row < rowNum; row++) {
         const row = document.createElement("tr");

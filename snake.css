@@ -23,7 +23,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    color: white;
+    color: #ddd;
     font-size: 50px;
     opacity: 0;
     animation: intro 1s linear;
@@ -37,7 +37,7 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    border: 1px solid white;
+    border: 1px solid #ddd;
 }
 
 .start-level-btn {
@@ -49,12 +49,25 @@ body {
     display: none;
     flex-direction: column;
     align-items: center;
-    border: 1px solid white;
+    border: 1px solid #ddd;
+}
+
+.game-box > div {
+    width: 100%;
 }
 
 .game-box__stats {
-    width: 100%;
-    height: 10vh;
+    order: 1;
+    border-bottom: 1px solid #ddd;
+}
+
+.game-box > table {
+    order: 2;
+}
+
+.game-box__control {
+    order: 3;
+    border-top: 1px solid #ddd;
 }
 
 .game-box table {
@@ -64,7 +77,7 @@ body {
 .game-box table tr td {
     width: 20px;
     height: 20px;
-    border: 1px solid #1c1d20;
+    border: 1px solid #151617;
 }
 
 @keyframes intro {
