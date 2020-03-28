@@ -75,9 +75,10 @@ body {
 }
 
 .game-box table tr td {
-    width: 20px;
-    height: 20px;
     border: 1px solid #151617;
+    color: white;
+    font-size: 14px;
+    text-align: center;
 }
 
 @keyframes intro {
