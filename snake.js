@@ -2,6 +2,13 @@
 // get DOM elements
 const $ = (selector, all = false) => all ? [...document.querySelectorAll(selector)] : document.querySelector(selector);
 
+/*
+    APP has a collection of properties that:
+        - stores references to dom elements (less DOM traversing)
+        - has values helping the navigation through the app
+        - has values displaying the app general layout
+        - has info about the app state of loading and settings
+*/
 const app = {
     // DOM ELEMENTS
     $intro: $(".intro"),
@@ -15,14 +22,22 @@ const app = {
     level: undefined,                                  // level object is set later  
     keyboard: false,                                   // if player can interact with keyboard
     gameTablePadding: 10,                              // the padding around the game arena in px
-    gameTableCellLength: 50,                           // the width and length of a single arena table cell in px
+    gameTableCellLength: 30,                           // the width and length of a single arena table cell in px
     interactionAllowed: false,                         // if player can interact with the game
 };
 
-// most values will be declared by different functions, but they are all declared for easier readability
+/* 
+    ARENA has a collection of properties that refers to any var thatvdirectly affecting
+        - gameplay
+        - interaction with the level map (arena) and display area (table)
+    most values will be declared by different functions, but they are all declared for easier readability
+*/
 const arena = {
     focusX: undefined,                                 // the snakes heads X pos
     focusY: undefined,                                 // the snakes heads Y pos
+    tableRowNum: undefined,                            // the displayable area expressed in table rows
+    tableColNum: undefined,                            // the displayable area expressed in table columns
+    centerHead: true,                                  // the first display tries to center map around characters head (focus point)
 }
 
 
@@ -87,10 +102,10 @@ function handleResize() {
 function handleKeypress(e) {
     if (app.interactionAllowed) {
         switch (e.keyCode) {
-            case 38: { console.log("UP"); break; }
-            case 40: { console.log("DOWN"); break; }
-            case 37: { console.log("LEFT"); break; }
-            case 39: { console.log("RIGHT"); break; }
+            case 38: { console.log("UP"); moveFocusPoint(0, -1); break; }
+            case 40: { console.log("DOWN"); moveFocusPoint(0, 1); break; }
+            case 37: { console.log("LEFT"); moveFocusPoint(-1, 0); break; }
+            case 39: { console.log("RIGHT"); moveFocusPoint(1, 0); break; }
             case 32: { console.log("SPACE"); break; }
         }
 
@@ -147,8 +162,7 @@ function buildGameArena() {
         const row = document.createElement("tr");
         for (let c = 0; c < colNum; c++) {
             const cell = document.createElement("td");
-            cell.id = `x${r}y${c}`
-            cell.innerHTML = r + "," + c;
+            cell.id = `r${r}c${c}`;
             row.appendChild(cell);
         }
         table.style.width = colNum * app.gameTableCellLength + "px";
@@ -157,6 +171,9 @@ function buildGameArena() {
     }
     app.$gameBox.appendChild(table);
 
+    arena.tableRowNum = rowNum;
+    arena.tableColNum = colNum;
+
     placeObjectsInArena();
 }
 
@@ -164,7 +181,21 @@ function buildGameArena() {
 
 function placeObjectsInArena() {
     // temporary!!!!!!
-    $(`#x${arena.focusX}y${arena.focusY}`).style.backgroundColor = "green";
+    $(`#r${arena.focusY}c${arena.focusX}`).style.backgroundColor = "green";
+
+    $(`#r${getTableCenterCoords().y}c${getTableCenterCoords().x}`).style.backgroundColor = "rgba(255, 30, 0, 0.1)";
+
+    for (let r = 0; r < arena.tableRowNum; r++) {
+        for (let c = 0; c < arena.tableColNum; c++) {
+            try {
+
+                $(`#r${r}c${c}`).title = r + "," + c;
+            }
+            catch (err) { console.log(r, c); }
+        }
+    }
+
+
 
 
     arena.objects.map(obj => {
@@ -177,4 +208,17 @@ function placeObjectsInArena() {
     });
 
     app.interactionAllowed = true;
+}
+
+
+
+const getTableCenterCoords = () => ({ x: Math.floor((arena.tableColNum - 1) / 2), y: Math.floor((arena.tableRowNum - 1) / 2) });
+
+
+
+function moveFocusPoint(x, y) {
+    arena.focusX += x;
+    arena.focusY += y;
+
+    placeObjectsInArena();
 }
