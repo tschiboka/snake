@@ -4,9 +4,9 @@
             100,
             100
         ],
-        "focus": [
-            10,
-            10
+        "characterHeadAt": [
+            2,
+            2
         ],
         "objects": [
             {
