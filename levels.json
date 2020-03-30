@@ -1,13 +1,13 @@
 [
     {
         "dimension": {
-            "rows": 80,
-            "cols": 80
+            "rows": 10,
+            "cols": 10
         },
         "gameCharacterCoords": [
             [
-                0,
-                0
+                1,
+                5
             ]
         ],
         "objects": [

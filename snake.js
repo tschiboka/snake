@@ -36,10 +36,8 @@ const app = {
     Most values will be declared by different game-play functions, but they are all defined here for easier readability
     (easier to look up and organize properties, values and their type (eg num, str))*/
 const arena = {
-    //    focusX: undefined,                                 // (+int) -> the display areas center X pos, floored (coord) 
-    //    focusY: undefined,                                 // (+int) -> the display areas center Y pos, floored (coord)
-    //    crossHairX: undefined,                             // (+int) -> the x coord on the map where display is centered
-    //    crossHairY: undefined,                             // (+int) -> the x coord on the map where display is centered
+    crossHairRow: undefined,                           // (+int) -> the x coord on the map where display is centered
+    crossHairCol: undefined,                           // (+int) -> the x coord on the map where display is centered
     tableRowNum: undefined,                            // (+int) -> the displayable area expressed in table rows (coord)
     tableColNum: undefined,                            // (+int) -> the displayable area expressed in table columns (coord)
     gameEntities: undefined,                           // (arr of objs) -> list of objects that appears on the game map
@@ -71,7 +69,7 @@ function handleClick(e) {
 function handleResize() {
     app.$gameBox.removeChild($(".game-arena"));
     buildGameTableArea();
-    arena.centerHead = true;
+    placeTableAtMap();
 }
 
 
@@ -227,29 +225,75 @@ function buildGameTableArea() {
     arena.tableRowNum = rowNum;
     arena.tableColNum = colNum;
 
-
     placeTableAtMap();
 }
 
 
+/*
+    Put table center around character and display relative coordinates
+    - find caracter
+    - find table center pos
+    - find the distance between table center and character
 
+
+*/
 function placeTableAtMap() {
-    centerTableAroundCharacter();
+    // head of the character (ind 0) row col on map
+    const [characterAtRow, characterAtCol] = arena.gameCharacterCoords[0];
+    // the table center point
+    const tableCenRow = Math.floor((arena.tableRowNum - 1) / 2);
+    const tableCenCol = Math.floor((arena.tableColNum - 1) / 2);
+
+    const distanceRow = characterAtRow - tableCenRow;
+    const distanceCol = characterAtCol - tableCenCol;
+
+    console.log(distanceRow, distanceCol);
+
+    for (let r = 0; r < arena.tableRowNum; r++) {
+        for (let c = 0; c < arena.tableColNum; c++) {
+            const rowOnMap = distanceRow + r;
+            const colOnMap = distanceCol + c;
+            $(`#r${r}c${c}`).style.background = "transparent";
+            $(`#r${r}c${c}`).innerHTML = rowOnMap + "|" + colOnMap;
+            if (rowOnMap === characterAtRow && colOnMap === characterAtCol) $(`#r${r}c${c}`).style.background = "blue";
+            if (rowOnMap === 1 && colOnMap === 1) $(`#r${r}c${c}`).style.background = "red";
+        }
+    }
+
+    $(`#r${tableCenRow}c${tableCenCol}`).style.color = "deeppink";
+
+    app.interactionAllowed = true;
+
+    // edges of map
+    //const mapMaxRow = app.level.dimension.rows - 1;
+    //const mapMaxCol = app.level.dimension.cols - 1;
+    // where are table edges if center is on top of character
+    //const tableMinRow = characterAtRow - tableCenRow;
+    //const tableMinCol = characterAtCol - tableCenCol;
+    //const tableMaxRow = arena.tableRowNum - 1 - tableCenRow + characterAtRow;
+    //const tableMaxCol = arena.tableColNum - 1 - tableCenCol + characterAtCol;
+    // whats the distance of the head from the tables center
+    //const distCenterFromHeadRow = tableCenRow - characterAtRow;
+    //const distCenterFromHeadCol = tableCenCol - characterAtCol;
+    // where is the center point on map
+    let tableCenterRowOnMap = characterAtRow;
+    let tableCenterColOnMap = characterAtCol;
+
+    // if table centre would be lower than row | col 0
+    //if (tableMinRow < 0) { tableCenterRowOnMap += tableCenRow; console.log("ROW TOO LOW"); }
+    //if (tableMinCol < 0) { tableCenterColOnMap += tableCenCol; console.log("COL TOO LOW"); }
+
+    // if table center would be higher than row | col level map
+    //if (tableMaxRow > mapMaxRow) { tableCenterRowOnMap -= tableCenRow; console.log("ROW TOO HIGH"); }
+    //if (tableMaxCol > mapMaxCol) { tableCenterColOnMap -= tableCenCol; console.log("COL TOO HIGH"); }
+
 }
 
 
-function centerTableAroundCharacter() {
-    const head = arena.gameCharacterCoords[0];
-    const centerRowOnTable = Math.floor((arena.tableRowNum - 1) / 2);
-    const centerColOnTable = Math.floor((arena.tableColNum - 1) / 2);
-
-    console.log(centerRowOnTable, centerColOnTable);
-
-    // temporalily paint head
-    $(`#r${head[0]}c${head[1]}`).style.background = "lightgreen";
-    $(`#r${centerRowOnTable}c${centerColOnTable}`).style.background = "rgba(255, 255, 255, 0.1)";
-}
 
 function moveCharacter(col, row) {
+    arena.gameCharacterCoords[0][0] += row;
+    arena.gameCharacterCoords[0][1] += col;
 
+    placeTableAtMap();
 }
