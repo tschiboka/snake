@@ -1,18 +1,20 @@
 [
     {
-        "dimension": [
-            100,
-            100
-        ],
-        "characterHeadAt": [
-            2,
-            2
+        "dimension": {
+            "rows": 80,
+            "cols": 80
+        },
+        "gameCharacterCoords": [
+            [
+                0,
+                0
+            ]
         ],
         "objects": [
             {
-                "type": "wall",
-                "x": 5,
-                "y": 10
+                "type": "wall-brick",
+                "row": 4,
+                "col": 6
             }
         ]
     }
