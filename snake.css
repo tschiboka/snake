@@ -74,6 +74,7 @@ body {
 .game-box table {
     border-collapse: collapse;
     table-layout: fixed;
+    width: 100%;
 }
 
 .game-box table tr td {

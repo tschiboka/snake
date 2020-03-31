@@ -12,7 +12,7 @@
         ],
         "objects": [
             {
-                "type": "wall-brick",
+                "type": "wallBrick",
                 "row": 4,
                 "col": 6
             }

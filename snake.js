@@ -45,13 +45,15 @@ const arena = {
     prevTableMap: undefined,                           // (arr of str)  -> if previous table coord has entity on it ("010110") (avoiding unneccesary repainting)
     gameEntities: undefined,                           // (arr of objs) -> list of objects that appears on the game map
     gameCharacterCoords: undefined,                    // (arr of arr)  -> the characters coord list
+    entityColors: {                                    // predifined list of the displayable colors -
+        "charHead": "green",                           // defined here in order to save computations -
+        "crosshair": "rgba(255, 255, 255, 0.05)",      // in 2d arr loop of displaying the table (can be > 1000s)
+        "wallBrick": "red",
+    }
 }
 
 // PERFORMANCE OPTIMISATION
-let loopCounter = 0; // for optimisation dev mode
 let functionTime = [];
-let painted = 0;
-
 
 
 /*##################################################################################################
@@ -185,7 +187,7 @@ function createGameArenaEntityArr(obj) {
 
     // game character
     arena.gameCharacterCoords = app.level.gameCharacterCoords;
-    arena.gameCharacterCoords.map(coord => entities[coord[0]][coord[1]] = coord);
+    //arena.gameCharacterCoords.map(coord => entities[coord[0]][coord[1]] = coord);
 
     return entities;
 }
@@ -240,6 +242,7 @@ function buildGameTableArea() {
 
 
 
+// position the table on the board centering around the characters head where it's possible
 function placeTableAtMap() {
     const t0 = performance.now();
     const tableCenRow = Math.floor((arena.tableRowNum - 1) / 2);
@@ -261,62 +264,46 @@ function placeTableAtMap() {
     if (displayRowsFrom + arena.tableRowNum - app.level.dimension.rows > 0) displayRowsFrom = app.level.dimension.rows - arena.tableRowNum;
     if (displayColsFrom + arena.tableColNum - app.level.dimension.cols > 0) displayColsFrom = app.level.dimension.cols - arena.tableColNum;
 
-    painted = 0;
     for (let r = 0; r < arena.tableRowNum; r++) {
         for (let c = 0; c < arena.tableColNum; c++) {
             [rowOnMap, colOnMap] = [displayRowsFrom + r, displayColsFrom + c];
             clearDisplayTable(r, c);
-            displayEntitiesOnTable(r, c, rowOnMap, colOnMap, characterAtRow, characterAtCol);
-
-            loopCounter++
+            displayEntitiesOnTable(r, c, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol);
         }
     }
-
-    arena[`$r${tableCenRow}c${tableCenCol}`].style.background = "deeppink";
-
-    // checking performance
-    // PAINTING
-    //console.log("Painted", (painted / (arena.tableRowNum * arena.tableColNum) * 100).toFixed(2), "%");
-
-    // LOOPS
-    //console.log(loopCounter);
-    loopCounter = 0;
-
-    // PERFORMANCE TIME
-    const t1 = performance.now();
-    functionTime.push(t1 - t0);
-    console.log((functionTime.reduce((p, c) => p + c) / functionTime.length).toFixed(2));
-
-
     app.interactionAllowed = true;
 }
 
 
 
+// table repainting is optimised, so only the cells that were painted in the prev display are getting reset
 function clearDisplayTable(row, col) {
     if (arena.prevTableMap[row][col] === "1") {
         arena[`$r${row}c${col}`].style.background = "transparent";
         arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "0"); // clear prevTableMap
-        painted++;
     }
 }
 
 
 
-function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol) {
-    // place character on table
-    if (rowOnMap % 5 === 0 || colOnMap % 5 === 0) {
-        arena[`$r${row}c${col}`].style.background = "rgba(255, 255, 255, 0.1)";
-        arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "1");
-    }
-    if (rowOnMap === characterAtRow && colOnMap === characterAtCol) {
-        arena[`$r${row}c${col}`].style.background = "green";
+// DOM call is only for elements that are being painted, color is declared globally to cut computation cost when rendering large tables 
+function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol) {
+    let color = "";
+    const entity = arena.gameEntities[rowOnMap][colOnMap];
+
+    if (entity) color = arena.entityColors[entity.type];
+    if (row === tableCenRow && col === tableCenCol) color = arena.entityColors.crosshair;
+    if (rowOnMap === characterAtRow && colOnMap === characterAtCol) color = arena.entityColors.charHead;
+
+    if (color) {
+        arena[`$r${row}c${col}`].style.background = color;
         arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "1");
     }
 }
 
 
 
+// move characters head calc the rest of the bodys positions
 function moveCharacter(row, col) {
     arena.gameCharacterCoords[0][0] += row;
     arena.gameCharacterCoords[0][1] += col;
