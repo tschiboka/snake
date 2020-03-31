@@ -4,8 +4,10 @@
 
 // HELPER FUNCTIONS
 
-// Get DOM elements
+// Get DOM elements (replace document.[querySelector | querySelectorAll])
 const $ = (selector, all = false) => all ? [...document.querySelectorAll(selector)] : document.querySelector(selector);
+// Replace a character (ch) in a string at index (i)
+String.prototype.replaceAt = function (i, ch) { return this.substr(0, i) + ch + this.substr(i + ch.length); }
 
 /*APP has a collection of properties that:
     - stores references to dom elements (less DOM traversing)
@@ -26,7 +28,7 @@ const app = {
     level: undefined,                                  // (obj)  -> level object is loaded later  
     keyboard: true,                                    // (flag) -> if player can interact with keyboard eg mobile
     gameTablePadding: 10,                              // (+int) -> the padding around the game arena in px
-    gameTableCellLength: 30,                           // (+int) -> the width and length of a single arena table cell in px
+    gameTableCellLength: 20,                           // (+int) -> the width and length of a single arena table cell in px
     interactionAllowed: false,                         // (flag) -> if player can interact with the game
 };
 
@@ -40,9 +42,15 @@ const arena = {
     crossHairCol: undefined,                           // (+int) -> the x coord on the map where display is centered
     tableRowNum: undefined,                            // (+int) -> the displayable area expressed in table rows (coord)
     tableColNum: undefined,                            // (+int) -> the displayable area expressed in table columns (coord)
+    prevTableMap: undefined,                           // (arr of str)  -> if previous table coord has entity on it ("010110") (avoiding unneccesary repainting)
     gameEntities: undefined,                           // (arr of objs) -> list of objects that appears on the game map
-    gameCharacterCoords: undefined,                    // (arr of arr) -> the characters coord list
+    gameCharacterCoords: undefined,                    // (arr of arr)  -> the characters coord list
 }
+
+// PERFORMANCE OPTIMISATION
+let loopCounter = 0; // for optimisation dev mode
+let functionTime = [];
+let painted = 0;
 
 
 
@@ -69,7 +77,6 @@ function handleClick(e) {
 function handleResize() {
     app.$gameBox.removeChild($(".game-arena"));
     buildGameTableArea();
-    placeTableAtMap();
 }
 
 
@@ -79,10 +86,10 @@ function handleResize() {
 function handleKeypress(e) {
     if (app.interactionAllowed) {
         switch (e.keyCode) {
-            case 38: { console.log("UP"); moveCharacter(0, -1); break; }
-            case 40: { console.log("DOWN"); moveCharacter(0, 1); break; }
-            case 37: { console.log("LEFT"); moveCharacter(-1, 0); break; }
-            case 39: { console.log("RIGHT"); moveCharacter(1, 0); break; }
+            case 38: { moveCharacter(-1, 0); break; }
+            case 40: { moveCharacter(1, 0); break; }
+            case 37: { moveCharacter(0, -1); break; }
+            case 39: { moveCharacter(0, 1); break; }
             case 32: { console.log("SPACE"); break; }
         }
 
@@ -162,14 +169,14 @@ function startLevel() {
     // assign current level to app obj
     app.level = app.levels[app.currentLevel - 1];
 
-    arena.gameEntities = createGameArenaObjectArr(app.level.objects);
+    arena.gameEntities = createGameArenaEntityArr(app.level.objects);
 
     buildGameTableArea();
 }
 
 
 
-function createGameArenaObjectArr(obj) {
+function createGameArenaEntityArr(obj) {
     // create an emtpty 2D array
     let entities = Array(app.level.dimension.rows).fill().map(() => Array(app.level.dimension.cols).fill());
 
@@ -213,7 +220,7 @@ function buildGameTableArea() {
         const row = document.createElement("tr");
         for (let c = 0; c < colNum; c++) {
             const cell = document.createElement("td");
-            cell.id = `r${r}c${c}`;
+            arena[`$r${r}c${c}`] = cell; // store cell elements in a var for optimising performance
             row.appendChild(cell);
         }
         table.style.width = colNum * app.gameTableCellLength + "px";
@@ -225,12 +232,16 @@ function buildGameTableArea() {
     arena.tableRowNum = rowNum;
     arena.tableColNum = colNum;
 
+    // create previous "busy" table map (first render all cells a bg)
+    arena.prevTableMap = Array(maxDisplayableRows).fill(new Array(maxDisplayableCols + 1).join("1"));
+
     placeTableAtMap();
 }
 
 
 
 function placeTableAtMap() {
+    const t0 = performance.now();
     const tableCenRow = Math.floor((arena.tableRowNum - 1) / 2);
     const tableCenCol = Math.floor((arena.tableColNum - 1) / 2);
     let [characterAtRow, characterAtCol] = arena.gameCharacterCoords[0];
@@ -250,24 +261,63 @@ function placeTableAtMap() {
     if (displayRowsFrom + arena.tableRowNum - app.level.dimension.rows > 0) displayRowsFrom = app.level.dimension.rows - arena.tableRowNum;
     if (displayColsFrom + arena.tableColNum - app.level.dimension.cols > 0) displayColsFrom = app.level.dimension.cols - arena.tableColNum;
 
+    painted = 0;
     for (let r = 0; r < arena.tableRowNum; r++) {
         for (let c = 0; c < arena.tableColNum; c++) {
             [rowOnMap, colOnMap] = [displayRowsFrom + r, displayColsFrom + c];
-            $(`#r${r}c${c}`).style.background = "transparent";
+            clearDisplayTable(r, c);
+            displayEntitiesOnTable(r, c, rowOnMap, colOnMap, characterAtRow, characterAtCol);
 
-            if (rowOnMap === characterAtRow && colOnMap === characterAtCol) $(`#r${r}c${c}`).style.background = "blue";
-            if (rowOnMap === 1 && colOnMap === 1) $(`#r${r}c${c}`).style.background = "red";
+            loopCounter++
         }
     }
 
-    $(`#r${tableCenRow}c${tableCenCol}`).style.color = "deeppink";
+    arena[`$r${tableCenRow}c${tableCenCol}`].style.background = "deeppink";
+
+    // checking performance
+    // PAINTING
+    //console.log("Painted", (painted / (arena.tableRowNum * arena.tableColNum) * 100).toFixed(2), "%");
+
+    // LOOPS
+    //console.log(loopCounter);
+    loopCounter = 0;
+
+    // PERFORMANCE TIME
+    const t1 = performance.now();
+    functionTime.push(t1 - t0);
+    console.log((functionTime.reduce((p, c) => p + c) / functionTime.length).toFixed(2));
+
 
     app.interactionAllowed = true;
 }
 
 
 
-function moveCharacter(col, row) {
+function clearDisplayTable(row, col) {
+    if (arena.prevTableMap[row][col] === "1") {
+        arena[`$r${row}c${col}`].style.background = "transparent";
+        arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "0"); // clear prevTableMap
+        painted++;
+    }
+}
+
+
+
+function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol) {
+    // place character on table
+    if (rowOnMap % 5 === 0 || colOnMap % 5 === 0) {
+        arena[`$r${row}c${col}`].style.background = "rgba(255, 255, 255, 0.1)";
+        arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "1");
+    }
+    if (rowOnMap === characterAtRow && colOnMap === characterAtCol) {
+        arena[`$r${row}c${col}`].style.background = "green";
+        arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "1");
+    }
+}
+
+
+
+function moveCharacter(row, col) {
     arena.gameCharacterCoords[0][0] += row;
     arena.gameCharacterCoords[0][1] += col;
 

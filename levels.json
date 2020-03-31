@@ -1,8 +1,8 @@
 [
     {
         "dimension": {
-            "rows": 40,
-            "cols": 40
+            "rows": 101,
+            "cols": 101
         },
         "gameCharacterCoords": [
             [

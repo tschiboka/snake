@@ -50,6 +50,7 @@ body {
     flex-direction: column;
     align-items: center;
     border: 1px solid #ddd;
+    cursor: none;
 }
 
 .game-box > div {
