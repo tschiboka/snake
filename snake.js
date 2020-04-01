@@ -30,6 +30,7 @@ const app = {
     gameTablePadding: 10,                              // (+int) -> the padding around the game arena in px
     gameTableCellLength: 20,                           // (+int) -> the width and length of a single arena table cell in px
     interactionAllowed: false,                         // (flag) -> if player can interact with the game
+    gameTableIsDrawn: false,                           // (flag) -> risize doesn't affect gametable until its not drawn or level is done
 };
 
 /* ARENA has a collection of properties that refers to any var that directly affecting
@@ -38,16 +39,14 @@ const app = {
     Most values will be declared by different game-play functions, but they are all defined here for easier readability
     (easier to look up and organize properties, values and their type (eg num, str))*/
 const arena = {
-    crossHairRow: undefined,                           // (+int) -> the x coord on the map where display is centered
-    crossHairCol: undefined,                           // (+int) -> the x coord on the map where display is centered
     tableRowNum: undefined,                            // (+int) -> the displayable area expressed in table rows (coord)
     tableColNum: undefined,                            // (+int) -> the displayable area expressed in table columns (coord)
     prevTableMap: undefined,                           // (arr of str)  -> if previous table coord has entity on it ("010110") (avoiding unneccesary repainting)
     gameEntities: undefined,                           // (arr of objs) -> list of objects that appears on the game map
-    gameCharacterCoords: undefined,                    // (arr of arr)  -> the characters coord list
     entityColors: {                                    // predifined list of the displayable colors -
         "charHead": "green",                           // defined here in order to save computations -
-        "crosshair": "rgba(255, 255, 255, 0.05)",      // in 2d arr loop of displaying the table (can be > 1000s)
+        "charBody": "lightGreen",                      // in 2d arr loop of displaying the table (can be > 1000s)
+        "crosshair": "rgba(255, 255, 255, 0.03)",
         "wallBrick": "red",
     }
 }
@@ -77,8 +76,10 @@ function handleClick(e) {
 
 // For responsivity games display area is scaling proportionally to windows available area
 function handleResize() {
-    app.$gameBox.removeChild($(".game-arena"));
-    buildGameTableArea();
+    if (app.gameTableIsDrawn) {
+        app.$gameBox.removeChild($(".game-arena"));
+        buildGameTableArea();
+    }
 }
 
 
@@ -171,23 +172,23 @@ function startLevel() {
     // assign current level to app obj
     app.level = app.levels[app.currentLevel - 1];
 
-    arena.gameEntities = createGameArenaEntityArr(app.level.objects);
+    arena.gameEntities = buildGameArenaEntitiesObject(app.level.objects);
 
     buildGameTableArea();
 }
 
 
 
-function createGameArenaEntityArr(obj) {
+function buildGameArenaEntitiesObject(obj) {
     // create an emtpty 2D array
-    let entities = Array(app.level.dimension.rows).fill().map(() => Array(app.level.dimension.cols).fill());
+    //let entities = Array(app.level.dimension.rows).fill().map(() => Array(app.level.dimension.cols).fill());
+    let entities = {};
 
     // objects in the map area
-    obj.forEach(o => { entities[o.row][o.col] = o; });
+    obj.forEach(o => { entities[`r${o.row}c${o.col}`] = { type: o.type }; });
 
     // game character
-    arena.gameCharacterCoords = app.level.gameCharacterCoords;
-    //arena.gameCharacterCoords.map(coord => entities[coord[0]][coord[1]] = coord);
+    app.level.gameCharacterCoords.map((coord, i) => entities[`r${coord[0]}c${coord[1]}`] = { type: (i === 0 ? "charHead" : "charBody"), index: i });
 
     return entities;
 }
@@ -242,18 +243,26 @@ function buildGameTableArea() {
 
 
 
+// function returns an arr of arr [[row, col], ...]
+const findEntitiesRowColIfType = (type) => {
+    const keys = Object.keys(arena.gameEntities).filter(k => arena.gameEntities[k].type === type);
+    return keys.map(k => k.match(/\d+/g).map(Number));
+}
+
+
+
 // position the table on the board centering around the characters head where it's possible
 function placeTableAtMap() {
-    const t0 = performance.now();
     const tableCenRow = Math.floor((arena.tableRowNum - 1) / 2);
     const tableCenCol = Math.floor((arena.tableColNum - 1) / 2);
-    let [characterAtRow, characterAtCol] = arena.gameCharacterCoords[0];
+    const gameCharacterHeadCoords = findEntitiesRowColIfType("charHead");
+    let [characterAtRow, characterAtCol] = gameCharacterHeadCoords[0];
 
     // keep character in range
-    if (characterAtRow < 0) arena.gameCharacterCoords[0][0] = characterAtRow = 0;
-    if (characterAtCol < 0) arena.gameCharacterCoords[0][1] = characterAtCol = 0;
-    if (characterAtRow > app.level.dimension.rows - 1) arena.gameCharacterCoords[0][0] = characterAtRow = app.level.dimension.rows - 1;
-    if (characterAtCol > app.level.dimension.cols - 1) arena.gameCharacterCoords[0][1] = characterAtCol = app.level.dimension.cols - 1;
+    if (characterAtRow < 0) gameCharacterHeadCoords[0][0] = characterAtRow = 0;
+    if (characterAtCol < 0) gameCharacterHeadCoords[0][1] = characterAtCol = 0;
+    if (characterAtRow > app.level.dimension.rows - 1) gameCharacterHeadCoords[0][0] = characterAtRow = app.level.dimension.rows - 1;
+    if (characterAtCol > app.level.dimension.cols - 1) gameCharacterHeadCoords[0][1] = characterAtCol = app.level.dimension.cols - 1;
 
     let displayRowsFrom = characterAtRow - tableCenRow;
     let displayColsFrom = characterAtCol - tableCenCol;
@@ -271,6 +280,7 @@ function placeTableAtMap() {
             displayEntitiesOnTable(r, c, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol);
         }
     }
+    app.gameTableIsDrawn = true;
     app.interactionAllowed = true;
 }
 
@@ -289,24 +299,43 @@ function clearDisplayTable(row, col) {
 // DOM call is only for elements that are being painted, color is declared globally to cut computation cost when rendering large tables 
 function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol) {
     let color = "";
-    const entity = arena.gameEntities[rowOnMap][colOnMap];
+    const entity = arena.gameEntities[`r${rowOnMap}c${colOnMap}`];
 
-    if (entity) color = arena.entityColors[entity.type];
     if (row === tableCenRow && col === tableCenCol) color = arena.entityColors.crosshair;
+    if (entity) color = arena.entityColors[entity.type];
     if (rowOnMap === characterAtRow && colOnMap === characterAtCol) color = arena.entityColors.charHead;
 
     if (color) {
         arena[`$r${row}c${col}`].style.background = color;
-        arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "1");
+        arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "1"); // set prevTableMap
     }
 }
 
 
 
-// move characters head calc the rest of the bodys positions
 function moveCharacter(row, col) {
-    arena.gameCharacterCoords[0][0] += row;
-    arena.gameCharacterCoords[0][1] += col;
+    // check if next move is in maps range or collides into other entity
+    let outOfRange = collides = false;
+    const characterCoords = [...findEntitiesRowColIfType("charHead").concat(findEntitiesRowColIfType("charBody"))]; // loose reference
+    if (characterCoords[0][0] + row < 0 || characterCoords[0][1] + col < 0) outOfRange = true;
+    if (characterCoords[0][0] + row > app.level.dimension.rows - 1 || characterCoords[0][1] + col > app.level.dimension.cols - 1) outOfRange = true;
+    if (arena.gameEntities[`r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`]) collides = true;
+    if (outOfRange || collides) return void (0);
+
+    // copy objs & delete character from entities obj
+    const characterObjCopys = []
+    characterCoords.forEach(coords => {
+        characterObjCopys.push(arena.gameEntities[`r${coords[0]}c${coords[1]}`]);
+        delete arena.gameEntities[`r${coords[0]}c${coords[1]}`];
+    });
+    characterObjCopys.sort((a, b) => a.index - b.index);
+
+    // calculate new positions
+    arena.gameEntities[`r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`] = characterObjCopys[0];
+    characterCoords.pop();
+    if (characterObjCopys.length > 1) {
+        characterCoords.forEach((coords, i) => { arena.gameEntities[`r${coords[0]}c${coords[1]}`] = characterObjCopys[i + 1]; });
+    }
 
     placeTableAtMap();
 }
