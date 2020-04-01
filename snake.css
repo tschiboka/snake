@@ -63,6 +63,13 @@ body {
 }
 
 .game-box > table {
+    position: relative;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    background: url("/images/galaxy.jpg");
+    background-repeat: repeat;
+    background-position: 0px 0px;
     order: 2;
 }
 
@@ -71,18 +78,21 @@ body {
     border-top: 1px solid #ddd;
 }
 
-.game-box table {
-    border-collapse: collapse;
-    table-layout: fixed;
-    width: 100%;
-}
-
 .game-box table tr td {
-    border: 1px solid #666;
+    border: 1px solid #111214;
     color: white;
     font-size: 14px;
     text-align: center;
     overflow: hidden;
+}
+
+.game-box > table #entity-box {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 0, 0, 0.1);
 }
 
 @keyframes intro {

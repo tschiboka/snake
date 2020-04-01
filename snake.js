@@ -20,6 +20,7 @@ const app = {
     $mainMenu: $(".main-menu"),                        // main menu
     $gameBox: $(".game-box"),                          // games div (stats, game, ?constrol for mobile)
     $control: $(".game-box__control"),                 // holds control btns (eg for mobile game-play)
+    $displayTable: undefined,                          // game board that holds character and all game entities (created later)
 
     // APP VARS
     introDuration: 1,                                  // (+int) -> the intro animation in secs
@@ -44,11 +45,14 @@ const arena = {
     prevTableMap: undefined,                           // (arr of str)  -> if previous table coord has entity on it ("010110") (avoiding unneccesary repainting)
     gameEntities: undefined,                           // (arr of objs) -> list of objects that appears on the game map
     entityColors: {                                    // predifined list of the displayable colors -
-        "charHead": "green",                           // defined here in order to save computations -
-        "charBody": "lightGreen",                      // in 2d arr loop of displaying the table (can be > 1000s)
+        "charHead": "rgba(134, 155, 162, 0.7)",        // defined here in order to save computations -
+        "charBody": "rgba(134, 155, 162, 0.5)",        // in 2d arr loop of displaying the table (can be > 1000s)
         "crosshair": "rgba(255, 255, 255, 0.03)",
         "wallBrick": "red",
-    }
+    },
+    parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
+    parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
+
 }
 
 // PERFORMANCE OPTIMISATION
@@ -116,9 +120,15 @@ function start() {
     const introTimer = setInterval(() => {
         --app.introDuration;
         if (!app.introDuration) {
-            clearInterval(introTimer);
-            if (app.loadLevelsState === "success") startGame();
-            else throw new Error("Levels have not been loaded yet ");
+            if (app.loadLevelsState === "success") {
+                clearInterval(introTimer);
+                startGame();
+            }
+            else if (app.loadLevelsState === "error") {
+                clearInterval(introTimer);
+                throw new Error("Levels couls not be loaded!");
+            }
+            else ++app.introDuration; // wait an other sec 
         }
     }, 1000);
 }
@@ -205,8 +215,8 @@ function buildGameArenaEntitiesObject(obj) {
 // space currently available in the browser window.
 function buildGameTableArea() {
     if (app.level.dimension.cols < 10 | app.level.dimension.rows < 10) throw new RangeError(`Level dimension must be min 10x10!\nCurrent dimension on level ${app.currentLevel} is ${app.level.dimension.cols}x${app.level.dimension.rows}.`)
-    const height = window.innerHeight;
-    const width = window.innerWidth;
+    let height = window.innerHeight;
+    let width = window.innerWidth;
     const gameHeight = height - (app.gameTablePadding * 2);
     const gameWidth = width - (app.gameTablePadding * 2);
     const navSpace = app.keyboard ? gameHeight * 0.1 : gameHeight * 0.2; // space for displaying points and navigation etc.
@@ -230,10 +240,24 @@ function buildGameTableArea() {
         table.style.height = rowNum * app.gameTableCellLength + "px";
         table.appendChild(row);
     }
+    app.$displayTable = table;
     app.$gameBox.appendChild(table);
 
     arena.tableRowNum = rowNum;
     arena.tableColNum = colNum;
+
+    // create entity box layer 
+    const entityBox = document.createElement("div");
+    entityBox.id = "entity-box";
+    app.$displayTable.appendChild(entityBox);
+
+
+    setTimeout(function () {                                            // setTimeOut puts code at the end of the active browser event queue with 0 delay
+        const { width, height } = app.$displayTable.getBoundingClientRect();     // code is queued right after the render operation 
+        //     entityBox.style.width = (width - app.gameTablePadding) + "px";
+        //   entityBox.style.height = height - app.gameTablePadding + "px";
+
+    }, 0);
 
     // create previous "busy" table map (first render all cells a bg)
     arena.prevTableMap = Array(maxDisplayableRows).fill(new Array(maxDisplayableCols + 1).join("1"));
@@ -273,6 +297,11 @@ function placeTableAtMap() {
     if (displayRowsFrom + arena.tableRowNum - app.level.dimension.rows > 0) displayRowsFrom = app.level.dimension.rows - arena.tableRowNum;
     if (displayColsFrom + arena.tableColNum - app.level.dimension.cols > 0) displayColsFrom = app.level.dimension.cols - arena.tableColNum;
 
+
+    // animate background (parallax)
+    const paralCoef = arena.parallaxCoefficient;
+    app.$displayTable.style.backgroundPosition = `${displayColsFrom * paralCoef * -1}px ${displayRowsFrom * paralCoef * -1}px`;
+
     for (let r = 0; r < arena.tableRowNum; r++) {
         for (let c = 0; c < arena.tableColNum; c++) {
             [rowOnMap, colOnMap] = [displayRowsFrom + r, displayColsFrom + c];
@@ -298,6 +327,7 @@ function clearDisplayTable(row, col) {
 
 // DOM call is only for elements that are being painted, color is declared globally to cut computation cost when rendering large tables 
 function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol) {
+    // set background colors
     let color = "";
     const entity = arena.gameEntities[`r${rowOnMap}c${colOnMap}`];
 
@@ -308,6 +338,17 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
     if (color) {
         arena[`$r${row}c${col}`].style.background = color;
         arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "1"); // set prevTableMap
+    }
+
+    if (entity) {
+        // find entity divs center position
+        const { x, y } = arena[`$r${row}c${col}`].getBoundingClientRect();
+        const [cX, cY] = [Math.round(x + (app.gameTableCellLength / 2)), Math.round(y + (app.gameTableCellLength / 2))];
+        const entityDiv = document.createElement("div");
+
+        entityDiv.classList = `entity--${entity.type}`;
+        entityDiv.style.top = cX + "px";
+        entityDiv.style.left = cY + "px";
     }
 }
 

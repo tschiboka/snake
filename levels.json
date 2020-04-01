@@ -1,8 +1,8 @@
 [
     {
         "dimension": {
-            "rows": 50,
-            "cols": 101
+            "rows": 100,
+            "cols": 100
         },
         "gameCharacterCoords": [
             [
@@ -28,6 +28,14 @@
             [
                 3,
                 4
+            ],
+            [
+                3,
+                3
+            ],
+            [
+                3,
+                2
             ]
         ],
         "objects": [
@@ -35,6 +43,16 @@
                 "type": "wallBrick",
                 "row": 4,
                 "col": 6
+            },
+            {
+                "type": "wallBrick",
+                "row": 5,
+                "col": 6
+            },
+            {
+                "type": "wallBrick",
+                "row": 90,
+                "col": 90
             }
         ]
     }
