@@ -18,8 +18,9 @@ const app = {
     // DOM ELEMENTS all (prefixed with $)
     $intro: $(".intro"),                               // intros wrapping div
     $mainMenu: $(".main-menu"),                        // main menu
-    $gameBox: $(".game-box"),                          // games div (stats, game, ?constrol for mobile)
-    $control: $(".game-box__control"),                 // holds control btns (eg for mobile game-play)
+    $game: $(".game"),                                 // games div (stats, game, ?constrol for mobile)
+    $control: $(".game__control"),                     // holds control btns (eg for mobile game-play)
+    $gameBox: $(".game__box"),                         // holds display table and entity obj divs 
     $displayTable: undefined,                          // game board that holds character and all game entities (created later)
 
     // APP VARS
@@ -27,7 +28,7 @@ const app = {
     loadLevelsState: "pending",                        // ("pending" | "success" | "error") -> if level JSON is loaded
     currentLevel: 1,                                   // (+int) -> default 1 unless local store has level stored
     level: undefined,                                  // (obj)  -> level object is loaded later  
-    keyboard: true,                                    // (flag) -> if player can interact with keyboard eg mobile
+    keyboard: false,                                    // (flag) -> if player can interact with keyboard eg mobile
     gameTablePadding: 10,                              // (+int) -> the padding around the game arena in px
     gameTableCellLength: 20,                           // (+int) -> the width and length of a single arena table cell in px
     interactionAllowed: false,                         // (flag) -> if player can interact with the game
@@ -175,7 +176,7 @@ function startGame() {
 // Set up level configuration
 function startLevel() {
     app.$mainMenu.style.display = "none";
-    app.$gameBox.style.display = "flex";
+    app.$game.style.display = "flex";
 
     if (app.keyboard) { app.$control.style.display = "none"; }
 
@@ -226,7 +227,7 @@ function buildGameTableArea() {
     const colNum = app.level.dimension.cols <= maxDisplayableCols ? app.level.dimension.cols : maxDisplayableCols;
     const table = document.createElement("table");
 
-    $(".game-box__stats, .game-box__control", true).map(elem => elem.style.height = Math.floor(gameHeight / 10) + "px");
+    $(".game__stats, .game__control", true).map(elem => elem.style.height = Math.floor(gameHeight / 10) + "px");
 
     table.classList.add("game-arena");
     for (let r = 0; r < rowNum; r++) {
@@ -249,15 +250,7 @@ function buildGameTableArea() {
     // create entity box layer 
     const entityBox = document.createElement("div");
     entityBox.id = "entity-box";
-    app.$displayTable.appendChild(entityBox);
-
-
-    setTimeout(function () {                                            // setTimeOut puts code at the end of the active browser event queue with 0 delay
-        const { width, height } = app.$displayTable.getBoundingClientRect();     // code is queued right after the render operation 
-        //     entityBox.style.width = (width - app.gameTablePadding) + "px";
-        //   entityBox.style.height = height - app.gameTablePadding + "px";
-
-    }, 0);
+    app.$gameBox.appendChild(entityBox);
 
     // create previous "busy" table map (first render all cells a bg)
     arena.prevTableMap = Array(maxDisplayableRows).fill(new Array(maxDisplayableCols + 1).join("1"));
