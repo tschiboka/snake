@@ -31,7 +31,7 @@ const app = {
     level: undefined,                                  // (obj)  -> level object is loaded later  
     keyboard: true,                                    // (flag) -> if player can interact with keyboard eg mobile
     gameTablePadding: 10,                              // (+int) -> the padding around the game arena in px
-    gameTableCellLength: 20,                           // (+int) -> the width and length of a single arena table cell in px
+    gameTableCellLength: 21,                           // (+int) -> the width and length of a single arena table cell in px
     interactionAllowed: false,                         // (flag) -> if player can interact with the game
     gameTableIsDrawn: false,                           // (flag) -> risize doesn't affect gametable until its not drawn or level is done
 };
@@ -453,7 +453,8 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
                 break;
             }
             case "wallBrick": {
-                switch (entity.model) {
+                const model = translateWallModelSyntax(entity.model);
+                switch (model) {
                     case "ver": { drawSingleVerticalBrickWall(entityDiv, entity); break; }
                 } // end of switch entity model
                 break;
@@ -508,6 +509,51 @@ function moveCharacter(row, col) {
   ##################################################################################################*/
 
 
+/*  Wall model naming syntax: (DIRECTION, LENGTH, START_JOINT, END_JOINT) eg: H5.LNC.TSONE
+    DIRECTION: (H|V) - horizontal / vertical
+    LENGTH: (+int && pos + int <= map size)
+    JOINTS: (joint type, direction, isOpen)
+        joint type: (L|T|X|C|O) L shape / T shape / + shape / closed / open (X does not need direction)
+        joint direction: (N|E|S|W) north, east, south, west (closed does not need direction)
+        H3.TOSW.XC eg horizontal wall of length 3 starts with a T shaped joint open in South 
+                      and West and ends in a + shaped joint closed in all direction
+*/
+function translateWallModelSyntax(modelStr) {
+    const model = {
+        direction: "",
+        length: 1,
+        singleBlock: false,              // is a single brick
+        singleBlockOpenSides: undefined, // [N, E, S, W]
+    };
+    const chunks = modelStr.toUpperCase().split(".");
+
+    if (chunks.length < 2) throw new Error("Wall Error: Badly separated model expression!" + modelStr);
+
+    // get direction
+    if (chunks[0][0] !== "H" && chunks[0][0] !== "V") throw new Error("Wall Model: First character must be V or H!" + modelStr);
+    model.direction = chunks[0][0] === "H" ? "horizontal" : "vertical";
+
+    console.log(chunks[0][1])
+    // get length
+    if (chunks[0][1] < 1) throw new Error("Wall Model: length must be greater than 0!" + modelStr);
+    if (isNaN(chunks[0][1])) throw new Error("Wall Model: Second character must be a number!" + modelStr);
+    // if length is 1
+    else if (chunks[0][1] == 1) {
+        // if only joint is C
+        if (chunks[1].length === 1 && chunks[1][0] === "C") {
+            model.singleBlock = true;
+            model.singleBlockOpenSides = [0, 0, 0, 0];
+        }
+        else if (chunks[1].match(/^[OC]{4}$/g)) {
+            model.singleBlock = true;
+            model.singleBlockOpenSides = [...chunks[1]].map(ch => ch === "C" ? 0 : 1);
+        }
+        else if (chunks[1].length !== 4) throw new Error("Wall Model: illegal property for character with length 1." + modelStr);
+    }
+    return model;
+}
+
+
 
 function createSvg(attrs) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -529,11 +575,9 @@ const getBrickColor = (n, e) => arena.brickColorSequence[e.colorSequence[n % are
 
 
 
-
-function drawSingleVerticalBrickWall(div, entity) {
+function drawSingleVerticalBrickWall(div, entity, model) {
     const l = app.gameTableCellLength;
     const svg = createSvg({ width: l, height: l });
-    console.log(getBrickColor(1, entity));
 
     const rect = svgDraw(
         "rect",

@@ -42,20 +42,27 @@
         "objects": [
             {
                 "type": "wallBrick",
-                "model": "ver",
-                "row": 4,
+                "model": "H1C",
+                "row": 2,
+                "col": 2
+            },
+            {
+                "type": "wallBrick",
+                "model": "V1C",
+                "row": 2,
+                "col": 4
+            },
+            {
+                "type": "wallBrick",
+                "model": "H1COCO",
+                "row": 2,
                 "col": 6
             },
             {
                 "type": "wallBrick",
-                "model": "ver",
-                "row": 5,
-                "col": 6
-            },
-            {
-                "type": "wallBrick",
-                "row": 90,
-                "col": 90
+                "model": "V1CCCO",
+                "row": 2,
+                "col": 8
             }
         ]
     }
