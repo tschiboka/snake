@@ -42,12 +42,13 @@
         "objects": [
             {
                 "type": "wallBrick",
-                "model": "hor",
+                "model": "ver",
                 "row": 4,
                 "col": 6
             },
             {
                 "type": "wallBrick",
+                "model": "ver",
                 "row": 5,
                 "col": 6
             },

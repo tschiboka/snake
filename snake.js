@@ -46,15 +46,20 @@ const arena = {
     tableColNum: undefined,                            // (+int) -> the displayable area expressed in table columns (coord)
     prevTableMap: undefined,                           // (arr of str)  -> if previous table coord has entity on it ("010110") (avoiding unneccesary repainting)
     gameEntities: undefined,                           // (arr of objs) -> list of objects that appears on the game map
-    entityColors: {                                    // predifined list of the displayable colors -
-        "charHead": "rgba(134, 155, 162, 0.2)",        // defined here in order to save computations -
-        "charBody": "rgba(134, 155, 162, 0.1)",        // in 2d arr loop of displaying the table (can be > 1000s)
+    entityColors: {                                    //     predifined list of the displayable colors -
+        "charHead": "rgba(134, 155, 162, 0.2)",        //     defined here in order to save computations -
+        "charBody": "rgba(134, 155, 162, 0.1)",        //     in 2d arr loop of displaying the table (can be > 1000s)
         "crosshair": "rgba(255, 255, 255, 0.03)",
         "wallBrick": "rgba(250, 150, 170, 0.3)",
     },
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
-    charDirection: ""                                  // (str)  -> (up|down|left|right)
+    charDirection: "",                                 // (str)  -> (up|down|left|right)
+    brickColorSequence: [                              // (arr)  -> colors of random individual brick colors
+        "#b3a432", "#9c8128", "#ab752b", "#d9a662",
+        "#d99062", "#d97862", "#e35839", "#e33f39",
+        "#c7221c", "#ed140c"
+    ]
 }
 
 // PERFORMANCE OPTIMISATION
@@ -201,6 +206,10 @@ function buildGameArenaEntitiesObject(obj) {
 
     // game character
     app.level.gameCharacterCoords.map((coord, i) => entities[`r${coord[0]}c${coord[1]}`] = { type: (i === 0 ? "charHead" : "charBody"), index: i });
+
+    // walls have different set of colorSequence
+    const createSequence = () => new Array(10).fill(1).map(n => n * Math.floor(Math.random() * 10));
+    obj.forEach(o => { if (entities[`r${o.row}c${o.col}`].type === "wallBrick") { entities[`r${o.row}c${o.col}`].colorSequence = createSequence(); } });
 
     return entities;
 }
@@ -445,7 +454,7 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
             }
             case "wallBrick": {
                 switch (entity.model) {
-                    case "ver": { drawSingleVerticalBrickWall(entityDiv); break; }
+                    case "ver": { drawSingleVerticalBrickWall(entityDiv, entity); break; }
                 } // end of switch entity model
                 break;
             }
@@ -516,9 +525,16 @@ function svgDraw(shape, attrs) {
 
 
 
-function drawSingleVerticalBrickWall(div) {
+const getBrickColor = (n, e) => arena.brickColorSequence[e.colorSequence[n % arena.brickColorSequence.length]];
+
+
+
+
+function drawSingleVerticalBrickWall(div, entity) {
     const l = app.gameTableCellLength;
     const svg = createSvg({ width: l, height: l });
+    console.log(getBrickColor(1, entity));
+
     const rect = svgDraw(
         "rect",
         {
