@@ -50,7 +50,7 @@ const arena = {
         "charHead": "rgba(134, 155, 162, 0.2)",        // defined here in order to save computations -
         "charBody": "rgba(134, 155, 162, 0.1)",        // in 2d arr loop of displaying the table (can be > 1000s)
         "crosshair": "rgba(255, 255, 255, 0.03)",
-        "wallBrick": "red",
+        "wallBrick": "rgba(250, 150, 170, 0.3)",
     },
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
@@ -99,7 +99,7 @@ function handleKeypress(e) {
             case 40: { moveCharacter(1, 0); break; }
             case 37: { moveCharacter(0, -1); break; }
             case 39: { moveCharacter(0, 1); break; }
-            case 32: { console.log("SPACE"); break; }
+            case 32: { console.log("SPACE"); }
         }
 
     }
@@ -197,7 +197,7 @@ function buildGameArenaEntitiesObject(obj) {
     let entities = {};
 
     // objects in the map area
-    obj.forEach(o => { entities[`r${o.row}c${o.col}`] = { type: o.type }; });
+    obj.forEach(o => { entities[`r${o.row}c${o.col}`] = { type: o.type, model: o.model }; });
 
     // game character
     app.level.gameCharacterCoords.map((coord, i) => entities[`r${coord[0]}c${coord[1]}`] = { type: (i === 0 ? "charHead" : "charBody"), index: i });
@@ -262,7 +262,7 @@ function buildGameTableArea() {
     // create previous "busy" table map (first render all cells a bg)
     arena.prevTableMap = Array(maxDisplayableRows).fill(new Array(maxDisplayableCols + 1).join("1"));
 
-    arena.charDirection = app.level.gameCharacterDirection;
+    arena.charDirection = arena.charDirection || app.level.gameCharacterDirection;
 
     placeTableAtMap();
 }
@@ -347,7 +347,7 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
     }
 
     if (entity) {
-        // find entity divs center position
+        // find entity divs x, y position
         const [x, y] = [elem.offsetLeft, elem.offsetTop];
         const entityDiv = document.createElement("div");
         entityDiv.classList.add(`entity--${entity.type}`, "entity");
@@ -359,17 +359,37 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
         switch (entity.type) {
             case "charBody": {
                 const charLength = app.level.gameCharacterCoords.length;
-                function transformBody(width) {
+                function transformBody(width, index) {
+                    // last body parts are closer to the previous one
+                    let addDistRowCol = [0, 0];
+                    let coef = index === charLength - 1 ? 6 : entity.index === charLength - 2 ? 3 : 0;
+                    if (index) {
+                        addDistRowCol = findEntitiesRowColIfType("charBody")                            // get entities type char body
+                            .map(rc => `r${rc[0]}c${rc[1]}`)                                            // get their ids
+                            .filter(id => arena.gameEntities[id].index === index - 1)[0]                // find previous index id
+                            .match(/\d+/g)                                                              // extract row col
+                            .map((rc, i) => i === 0 ? (rc - rowOnMap) * coef : (rc - colOnMap) * coef); // get difference in col row
+                    }
+
                     entityDiv.style.width = app.gameTableCellLength - width + "px";
                     entityDiv.style.height = app.gameTableCellLength - width + "px";
-                    entityDiv.style.transform = `translate(${(width / 2) - 1}px, ${width / 2}px)`;
-                    entityDiv.style.WebkitTransform = `translate(${(width / 2) - 1}px, ${width / 2}px)`;
+                    entityDiv.style.transform = `translate(${(width / 2) + addDistRowCol[1]}px, ${(width / 2) + addDistRowCol[0]}px)`;
+                    entityDiv.style.WebkitTransform = `translate(${(width / 2) + addDistRowCol[1]}px, ${(width / 2) + addDistRowCol[0]}px)`;
                 }
 
                 if (entity.index === charLength - 1) { transformBody(8, entity.index); }
-                else if (entity.index === charLength - 2) { transformBody(6); }
+                else if (entity.index === charLength - 2) { transformBody(6, entity.index); }
                 else if (entity.index === charLength - 3) { transformBody(4); }
                 else { transformBody(2); }
+                if (entity.index === 1) {
+                    switch (arena.charDirection) {
+                        case "left": { entityDiv.style.borderRadius = "0px 2px 2px 0px"; break; }
+                        case "right": { entityDiv.style.borderRadius = "2px 0px 0px 2px"; break; }
+                        case "up": { entityDiv.style.borderRadius = "0px 0px 2px 2px"; break; }
+                        case "down": { entityDiv.style.borderRadius = "2px 2px 0px 0px"; }
+                    }
+                }
+
                 entityDiv.style.backgroundColor = `rgba(200, 180, 255, ${0.6 - (entity.index / 20)})`;
                 break;
             }
@@ -377,14 +397,21 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
                 entityDiv.style.width = app.gameTableCellLength - 2 + "px";
                 entityDiv.style.height = app.gameTableCellLength - 2 + "px";
                 entityDiv.style.backgroundColor = "black";
-                entityDiv.style.transform = "translate(0px, 1px)";
-                entityDiv.style.WebkitTransform = "translate(0px, 1px)";
+
+                if (arena.charDirection === "left" || arena.charDirection === "right") {
+                    entityDiv.style.transform = "translate(0px, 1px)";
+                    entityDiv.style.WebkitTransform = "translate(0px, 1px)";
+                }
+                if (arena.charDirection === "up" || arena.charDirection === "down") {
+                    entityDiv.style.transform = "translate(1px, 0px)";
+                    entityDiv.style.WebkitTransform = "translate(1px, 0px)";
+                }
 
                 switch (arena.charDirection) {
-                    case "left": { entityDiv.style.borderRadius = "7px 2px 2px 7px"; break; }
-                    case "right": { entityDiv.style.borderRadius = "2px 7px 7px 2px"; break; }
-                    case "up": { entityDiv.style.borderRadius = "7px 7px 2px 2px"; break; }
-                    case "down": { entityDiv.style.borderRadius = "2px 2px 7px 7px"; break; }
+                    case "left": { entityDiv.style.borderRadius = "7px 0px 0px 7px"; break; }
+                    case "right": { entityDiv.style.borderRadius = "0px 7px 7px 0px"; break; }
+                    case "up": { entityDiv.style.borderRadius = "7px 7px 0px 0px"; break; }
+                    case "down": { entityDiv.style.borderRadius = "0px 0px 7px 7px"; }
                 }
 
                 // eyes
@@ -403,23 +430,26 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
 
                 // eyes are placed differently according to the move direction being horizontal or vertical
                 if (arena.charDirection === "up" || arena.charDirection === "down") {
-                    eye1.style.width = "50%";
-                    eye2.style.width = "50%";
-                    eye1.style.height = "100%";
-                    eye2.style.height = "100%";
+                    eye1.style.width = "50%"; eye1.style.height = "100%";
+                    eye2.style.width = "50%"; eye2.style.height = "100%";
                 }
-                // eyes are placed differently according to the move direction being horizontal or vertical
                 if (arena.charDirection === "left" || arena.charDirection === "right") {
-                    eye1.style.width = "100%";
-                    eye2.style.width = "100%";
-                    eye1.style.height = "50%";
-                    eye2.style.height = "50%";
+                    eye1.style.width = "100%"; eye1.style.height = "50%";
+                    eye2.style.width = "100%"; eye2.style.height = "50%";
                     entityDiv.style.flexDirection = "column";
                 }
+
                 entityDiv.appendChild(eye1);
                 entityDiv.appendChild(eye2);
+                break;
             }
-        }
+            case "wallBrick": {
+                switch (entity.model) {
+                    case "ver": { drawSingleVerticalBrickWall(entityDiv); break; }
+                } // end of switch entity model
+                break;
+            }
+        } // end of switch entity type
 
         app.$entityBox.appendChild(entityDiv);
     }
@@ -456,8 +486,66 @@ function moveCharacter(row, col) {
         case "-10": { arena.charDirection = "up"; break; }
         case "10": { arena.charDirection = "down"; break; }
         case "0-1": { arena.charDirection = "left"; break; }
-        case "01": { arena.charDirection = "right"; break; }
+        case "01": { arena.charDirection = "right"; }
     }
 
     placeTableAtMap();
+}
+
+
+
+/*##################################################################################################
+  ###################################  SVG DRAWING FUNCTIONS  ######################################
+  ##################################################################################################*/
+
+
+
+function createSvg(attrs) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    Object.keys(attrs).forEach(key => { svg.setAttributeNS(null, key, attrs[key]); });
+    return svg;
+}
+
+
+
+function svgDraw(shape, attrs) {
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", shape);
+    Object.keys(attrs).forEach(key => { rect.setAttributeNS(null, key, attrs[key]); });
+    return rect;
+}
+
+
+
+function drawSingleVerticalBrickWall(div) {
+    const l = app.gameTableCellLength;
+    const svg = createSvg({ width: l, height: l });
+    const rect = svgDraw(
+        "rect",
+        {
+            x: 0, y: 0, width: l - 1, height: l - 1,
+            stroke: "rgba(255, 255, 255, 0.2)", fill: "transparent"
+        });
+    const vLine1 = svgDraw("line", {
+        x1: l / 3, y1: 1, x2: l / 3, y2: l - 1,
+        stroke: "rgba(255, 255, 255, 0.2)", "stroke-width": 1, fill: "transparent"
+    });
+    const vLine2 = svgDraw("line", {
+        x1: l / 3 * 2, y1: 1, x2: l / 3 * 2, y2: l - 1,
+        stroke: "rgba(255, 255, 255, 0.2)", "stroke-width": 1, fill: "transparent"
+    });
+    const hLine1 = svgDraw("line", {
+        x1: 0, y1: l / 2, x2: l / 3, y2: l / 2,
+        stroke: "rgba(255, 255, 255, 0.2)", "stroke-width": 1, fill: "transparent"
+    });
+    const hLine2 = svgDraw("line", {
+        x1: l / 3 * 2, y1: l / 2, x2: l, y2: l / 2,
+        stroke: "rgba(255, 255, 255, 0.2)", "stroke-width": 1, fill: "transparent"
+    });
+
+    svg.appendChild(rect);
+    svg.appendChild(vLine1);
+    svg.appendChild(vLine2);
+    svg.appendChild(hLine1);
+    svg.appendChild(hLine2);
+    div.appendChild(svg);
 }

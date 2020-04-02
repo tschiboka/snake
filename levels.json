@@ -42,6 +42,7 @@
         "objects": [
             {
                 "type": "wallBrick",
+                "model": "hor",
                 "row": 4,
                 "col": 6
             },
