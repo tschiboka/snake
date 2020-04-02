@@ -50,7 +50,7 @@ const arena = {
         "charHead": "rgba(134, 155, 162, 0.2)",        //     defined here in order to save computations -
         "charBody": "rgba(134, 155, 162, 0.1)",        //     in 2d arr loop of displaying the table (can be > 1000s)
         "crosshair": "rgba(255, 255, 255, 0.03)",
-        "wallBrick": "rgba(250, 150, 170, 0.3)",
+        "wallBrick": "rgba(255, 255, 255, 0.2)",
     },
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
@@ -454,9 +454,8 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
             }
             case "wallBrick": {
                 const model = translateWallModelSyntax(entity.model);
-                switch (model) {
-                    case "ver": { drawSingleVerticalBrickWall(entityDiv, entity); break; }
-                } // end of switch entity model
+
+                if (model.singleBlock) drawSingleWallBlock(entityDiv, entity, model);
                 break;
             }
         } // end of switch entity type
@@ -527,16 +526,16 @@ function translateWallModelSyntax(modelStr) {
     };
     const chunks = modelStr.toUpperCase().split(".");
 
-    if (chunks.length < 2) throw new Error("Wall Error: Badly separated model expression!" + modelStr);
+    if (chunks.length < 2) throw new Error("Wall Error: Badly separated model expression!\t" + modelStr);
 
     // get direction
-    if (chunks[0][0] !== "H" && chunks[0][0] !== "V") throw new Error("Wall Model: First character must be V or H!" + modelStr);
+    if (chunks[0][0] !== "H" && chunks[0][0] !== "V") throw new Error("Wall Model: First character must be V or H!\t" + modelStr);
     model.direction = chunks[0][0] === "H" ? "horizontal" : "vertical";
 
     console.log(chunks[0][1])
     // get length
-    if (chunks[0][1] < 1) throw new Error("Wall Model: length must be greater than 0!" + modelStr);
-    if (isNaN(chunks[0][1])) throw new Error("Wall Model: Second character must be a number!" + modelStr);
+    if (chunks[0][1] < 1) throw new Error("Wall Model: length must be greater than 0!\t" + modelStr);
+    if (isNaN(chunks[0][1])) throw new Error("Wall Model: Second character must be a number!\t" + modelStr);
     // if length is 1
     else if (chunks[0][1] == 1) {
         // if only joint is C
@@ -544,11 +543,15 @@ function translateWallModelSyntax(modelStr) {
             model.singleBlock = true;
             model.singleBlockOpenSides = [0, 0, 0, 0];
         }
+        else if (chunks[1].length === 1 && chunks[1][0] === "O") {
+            model.singleBlock = true;
+            model.singleBlockOpenSides = [1, 1, 1, 1];
+        }
         else if (chunks[1].match(/^[OC]{4}$/g)) {
             model.singleBlock = true;
             model.singleBlockOpenSides = [...chunks[1]].map(ch => ch === "C" ? 0 : 1);
         }
-        else if (chunks[1].length !== 4) throw new Error("Wall Model: illegal property for character with length 1." + modelStr);
+        else if (chunks[1].length !== 4) throw new Error("Wall Model: illegal property for character with length 1.\t" + modelStr);
     }
     return model;
 }
@@ -571,41 +574,65 @@ function svgDraw(shape, attrs) {
 
 
 
-const getBrickColor = (n, e) => arena.brickColorSequence[e.colorSequence[n % arena.brickColorSequence.length]];
+const getBrickColor = (n, e) => arena.brickColorSequence[e.colorSequence[n % arena.brickColorSequence.length]] + "60"; // last + str is hex for some transparency
 
 
 
-function drawSingleVerticalBrickWall(div, entity, model) {
+function drawSingleWallBlock(div, entity, model) {
     const l = app.gameTableCellLength;
     const svg = createSvg({ width: l, height: l });
+    const c1 = "rgba(255, 255, 255, 0.9)";
+    const c2 = "rgba(255, 255, 255, 0.3)";
+    let rect1;
 
-    const rect = svgDraw(
-        "rect",
-        {
-            x: 0, y: 0, width: l - 1, height: l - 1,
-            stroke: "rgba(255, 255, 255, 0.2)", fill: "transparent"
-        });
-    const vLine1 = svgDraw("line", {
-        x1: l / 3, y1: 1, x2: l / 3, y2: l - 1,
-        stroke: "rgba(255, 255, 255, 0.2)", "stroke-width": 1, fill: "transparent"
-    });
-    const vLine2 = svgDraw("line", {
-        x1: l / 3 * 2, y1: 1, x2: l / 3 * 2, y2: l - 1,
-        stroke: "rgba(255, 255, 255, 0.2)", "stroke-width": 1, fill: "transparent"
-    });
-    const hLine1 = svgDraw("line", {
-        x1: 0, y1: l / 2, x2: l / 3, y2: l / 2,
-        stroke: "rgba(255, 255, 255, 0.2)", "stroke-width": 1, fill: "transparent"
-    });
-    const hLine2 = svgDraw("line", {
-        x1: l / 3 * 2, y1: l / 2, x2: l, y2: l / 2,
-        stroke: "rgba(255, 255, 255, 0.2)", "stroke-width": 1, fill: "transparent"
-    });
+    if (model.direction === "horizontal") {
+        rect1 = svgDraw("rect", { x: 0, y: 0, width: l / 2, height: l / 3, fill: getBrickColor(0, entity) });
+        rect2 = svgDraw("rect", { x: l / 2, y: 0, width: l / 2, height: l / 3, fill: getBrickColor(1, entity) });
+        rect3 = svgDraw("rect", { x: 0, y: l / 3, width: l, height: l / 3, fill: getBrickColor(2, entity) });
+        rect4 = svgDraw("rect", { x: 0, y: l / 3 * 2, width: l / 2, height: l / 3, fill: getBrickColor(3, entity) });
+        rect5 = svgDraw("rect", { x: l / 2, y: l / 3 * 2, width: l / 2, height: l / 3, fill: getBrickColor(4, entity) });
 
-    svg.appendChild(rect);
-    svg.appendChild(vLine1);
-    svg.appendChild(vLine2);
-    svg.appendChild(hLine1);
-    svg.appendChild(hLine2);
+        line5 = svgDraw("line", { x1: 0, x2: l, y1: l / 3, y2: l / 3, stroke: c2, "stroke-width": 1 });
+        line6 = svgDraw("line", { x1: 0, x2: l, y1: l / 3 * 2, y2: l / 3 * 2, stroke: c2, "stroke-width": 1 });
+        line7 = svgDraw("line", { x1: l / 2, x2: l / 2, y1: 0, y2: l / 3, stroke: c2, "stroke-width": 1 });
+        line8 = svgDraw("line", { x1: l / 2, x2: l / 2, y1: l / 3 * 2, y2: l, stroke: c2, "stroke-width": 1 });
+    } else {
+        rect1 = svgDraw("rect", { x: 0, y: 0, width: l / 3, height: l / 2, fill: getBrickColor(0, entity) });
+        rect2 = svgDraw("rect", { x: l / 3, y: 0, width: l / 3, height: l, fill: getBrickColor(1, entity) });
+        rect3 = svgDraw("rect", { x: l / 3 * 2, y: 0, width: l / 3, height: l / 2, fill: getBrickColor(2, entity) });
+        rect4 = svgDraw("rect", { x: 0, y: l / 2, width: l / 3, height: l / 2, fill: getBrickColor(3, entity) });
+        rect5 = svgDraw("rect", { x: l / 3 * 2, y: l / 2, width: l / 3, height: l / 2, fill: getBrickColor(4, entity) });
+
+        line5 = svgDraw("line", { x1: l / 3, x2: l / 3, y1: 0, y2: l, stroke: c2, "stroke-width": 1 });
+        line6 = svgDraw("line", { x1: l / 3 * 2, x2: l / 3 * 2, y1: 0, y2: l, stroke: c2, "stroke-width": 1 });
+        line7 = svgDraw("line", { x1: 0, x2: l / 3, y1: l / 2, y2: l / 2, stroke: c2, "stroke-width": 1 });
+        line8 = svgDraw("line", { x1: l / 3 * 2, x2: l, y1: l / 2, y2: l / 2, stroke: c2, "stroke-width": 1 });
+    }
+
+    if (!model.singleBlockOpenSides[0]) {
+        line1 = svgDraw("line", { x1: 0, x2: l, y1: 0, y2: 0, stroke: c1, "stroke-width": 2 });
+        svg.appendChild(line1);
+    }
+    if (!model.singleBlockOpenSides[1]) {
+        line2 = svgDraw("line", { x1: l, x2: l, y1: 0, y2: l, stroke: c1, "stroke-width": 2 });
+        svg.appendChild(line2);
+    }
+    if (!model.singleBlockOpenSides[2]) {
+        line3 = svgDraw("line", { x1: 0, x2: l, y1: l, y2: l, stroke: c1, "stroke-width": 2 });
+        svg.appendChild(line3);
+    }
+    if (!model.singleBlockOpenSides[3]) {
+        line4 = svgDraw("line", { x1: 0, x2: 0, y1: 0, y2: l, stroke: c1, "stroke-width": 2 });
+        svg.appendChild(line4);
+    }
+    svg.appendChild(rect1);
+    svg.appendChild(rect2);
+    svg.appendChild(rect3);
+    svg.appendChild(rect4);
+    svg.appendChild(rect5);
+    svg.appendChild(line5);
+    svg.appendChild(line6);
+    svg.appendChild(line7);
+    svg.appendChild(line8);
     div.appendChild(svg);
 }
