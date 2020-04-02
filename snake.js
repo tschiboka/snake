@@ -29,7 +29,7 @@ const app = {
     loadLevelsState: "pending",                        // ("pending" | "success" | "error") -> if level JSON is loaded
     currentLevel: 1,                                   // (+int) -> default 1 unless local store has level stored
     level: undefined,                                  // (obj)  -> level object is loaded later  
-    keyboard: false,                                    // (flag) -> if player can interact with keyboard eg mobile
+    keyboard: true,                                    // (flag) -> if player can interact with keyboard eg mobile
     gameTablePadding: 10,                              // (+int) -> the padding around the game arena in px
     gameTableCellLength: 20,                           // (+int) -> the width and length of a single arena table cell in px
     interactionAllowed: false,                         // (flag) -> if player can interact with the game
@@ -47,14 +47,14 @@ const arena = {
     prevTableMap: undefined,                           // (arr of str)  -> if previous table coord has entity on it ("010110") (avoiding unneccesary repainting)
     gameEntities: undefined,                           // (arr of objs) -> list of objects that appears on the game map
     entityColors: {                                    // predifined list of the displayable colors -
-        "charHead": "rgba(134, 155, 162, 0.7)",        // defined here in order to save computations -
-        "charBody": "rgba(134, 155, 162, 0.5)",        // in 2d arr loop of displaying the table (can be > 1000s)
+        "charHead": "rgba(134, 155, 162, 0.2)",        // defined here in order to save computations -
+        "charBody": "rgba(134, 155, 162, 0.1)",        // in 2d arr loop of displaying the table (can be > 1000s)
         "crosshair": "rgba(255, 255, 255, 0.03)",
         "wallBrick": "red",
     },
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
-
+    charDirection: ""                                  // (str)  -> (up|down|left|right)
 }
 
 // PERFORMANCE OPTIMISATION
@@ -258,8 +258,11 @@ function buildGameTableArea() {
     app.$entityBox = entityBox;
     app.$gameBox.appendChild(entityBox);
 
+
     // create previous "busy" table map (first render all cells a bg)
     arena.prevTableMap = Array(maxDisplayableRows).fill(new Array(maxDisplayableCols + 1).join("1"));
+
+    arena.charDirection = app.level.gameCharacterDirection;
 
     placeTableAtMap();
 }
@@ -353,6 +356,71 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
         entityDiv.style.width = app.gameTableCellLength + "px";
         entityDiv.style.height = app.gameTableCellLength + "px";
 
+        switch (entity.type) {
+            case "charBody": {
+                const charLength = app.level.gameCharacterCoords.length;
+                function transformBody(width) {
+                    entityDiv.style.width = app.gameTableCellLength - width + "px";
+                    entityDiv.style.height = app.gameTableCellLength - width + "px";
+                    entityDiv.style.transform = `translate(${(width / 2) - 1}px, ${width / 2}px)`;
+                    entityDiv.style.WebkitTransform = `translate(${(width / 2) - 1}px, ${width / 2}px)`;
+                }
+
+                if (entity.index === charLength - 1) { transformBody(8, entity.index); }
+                else if (entity.index === charLength - 2) { transformBody(6); }
+                else if (entity.index === charLength - 3) { transformBody(4); }
+                else { transformBody(2); }
+                entityDiv.style.backgroundColor = `rgba(200, 180, 255, ${0.6 - (entity.index / 20)})`;
+                break;
+            }
+            case "charHead": {
+                entityDiv.style.width = app.gameTableCellLength - 2 + "px";
+                entityDiv.style.height = app.gameTableCellLength - 2 + "px";
+                entityDiv.style.backgroundColor = "black";
+                entityDiv.style.transform = "translate(0px, 1px)";
+                entityDiv.style.WebkitTransform = "translate(0px, 1px)";
+
+                switch (arena.charDirection) {
+                    case "left": { entityDiv.style.borderRadius = "7px 2px 2px 7px"; break; }
+                    case "right": { entityDiv.style.borderRadius = "2px 7px 7px 2px"; break; }
+                    case "up": { entityDiv.style.borderRadius = "7px 7px 2px 2px"; break; }
+                    case "down": { entityDiv.style.borderRadius = "2px 2px 7px 7px"; break; }
+                }
+
+                // eyes
+                function createEyes() {
+                    const eyeCavity = document.createElement("div");
+                    eyeCavity.classList.add("entity--charEyeCavity");
+                    const eye = document.createElement("div");
+                    eye.classList.add("entity--charEye");
+                    eyeCavity.appendChild(eye);
+                    return eyeCavity;
+                }
+                createEyes();
+
+                const eye1 = createEyes();
+                const eye2 = createEyes();
+
+                // eyes are placed differently according to the move direction being horizontal or vertical
+                if (arena.charDirection === "up" || arena.charDirection === "down") {
+                    eye1.style.width = "50%";
+                    eye2.style.width = "50%";
+                    eye1.style.height = "100%";
+                    eye2.style.height = "100%";
+                }
+                // eyes are placed differently according to the move direction being horizontal or vertical
+                if (arena.charDirection === "left" || arena.charDirection === "right") {
+                    eye1.style.width = "100%";
+                    eye2.style.width = "100%";
+                    eye1.style.height = "50%";
+                    eye2.style.height = "50%";
+                    entityDiv.style.flexDirection = "column";
+                }
+                entityDiv.appendChild(eye1);
+                entityDiv.appendChild(eye2);
+            }
+        }
+
         app.$entityBox.appendChild(entityDiv);
     }
 }
@@ -381,6 +449,14 @@ function moveCharacter(row, col) {
     characterCoords.pop();
     if (characterObjCopys.length > 1) {
         characterCoords.forEach((coords, i) => { arena.gameEntities[`r${coords[0]}c${coords[1]}`] = characterObjCopys[i + 1]; });
+    }
+
+    // direction must be determined if movement doesn't end with collision
+    switch ("" + row + col) {
+        case "-10": { arena.charDirection = "up"; break; }
+        case "10": { arena.charDirection = "down"; break; }
+        case "0-1": { arena.charDirection = "left"; break; }
+        case "01": { arena.charDirection = "right"; break; }
     }
 
     placeTableAtMap();
