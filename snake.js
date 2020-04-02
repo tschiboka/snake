@@ -21,6 +21,7 @@ const app = {
     $game: $(".game"),                                 // games div (stats, game, ?constrol for mobile)
     $control: $(".game__control"),                     // holds control btns (eg for mobile game-play)
     $gameBox: $(".game__box"),                         // holds display table and entity obj divs 
+    $entityBox: undefined,                             // holds every game characters', objects' divs (created later)
     $displayTable: undefined,                          // game board that holds character and all game entities (created later)
 
     // APP VARS
@@ -247,9 +248,14 @@ function buildGameTableArea() {
     arena.tableRowNum = rowNum;
     arena.tableColNum = colNum;
 
+    // delete previous entity box if existed
+    const oldEntityBox = $("#entity-box");
+    if (oldEntityBox) oldEntityBox.parentNode.removeChild(oldEntityBox);
+
     // create entity box layer 
     const entityBox = document.createElement("div");
     entityBox.id = "entity-box";
+    app.$entityBox = entityBox;
     app.$gameBox.appendChild(entityBox);
 
     // create previous "busy" table map (first render all cells a bg)
@@ -295,6 +301,9 @@ function placeTableAtMap() {
     const paralCoef = arena.parallaxCoefficient;
     app.$displayTable.style.backgroundPosition = `${displayColsFrom * paralCoef * -1}px ${displayRowsFrom * paralCoef * -1}px`;
 
+    // clear entity divs
+    app.$entityBox.innerHTML = "";
+
     for (let r = 0; r < arena.tableRowNum; r++) {
         for (let c = 0; c < arena.tableColNum; c++) {
             [rowOnMap, colOnMap] = [displayRowsFrom + r, displayColsFrom + c];
@@ -321,7 +330,7 @@ function clearDisplayTable(row, col) {
 // DOM call is only for elements that are being painted, color is declared globally to cut computation cost when rendering large tables 
 function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol) {
     // set background colors
-    let color = "";
+    let color = "", elem;
     const entity = arena.gameEntities[`r${rowOnMap}c${colOnMap}`];
 
     if (row === tableCenRow && col === tableCenCol) color = arena.entityColors.crosshair;
@@ -329,19 +338,22 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
     if (rowOnMap === characterAtRow && colOnMap === characterAtCol) color = arena.entityColors.charHead;
 
     if (color) {
-        arena[`$r${row}c${col}`].style.background = color;
+        elem = arena[`$r${row}c${col}`];
+        elem.style.background = color;
         arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "1"); // set prevTableMap
     }
 
     if (entity) {
         // find entity divs center position
-        const { x, y } = arena[`$r${row}c${col}`].getBoundingClientRect();
-        const [cX, cY] = [Math.round(x + (app.gameTableCellLength / 2)), Math.round(y + (app.gameTableCellLength / 2))];
+        const [x, y] = [elem.offsetLeft, elem.offsetTop];
         const entityDiv = document.createElement("div");
+        entityDiv.classList.add(`entity--${entity.type}`, "entity");
+        entityDiv.style.top = y + "px";
+        entityDiv.style.left = x + "px";
+        entityDiv.style.width = app.gameTableCellLength + "px";
+        entityDiv.style.height = app.gameTableCellLength + "px";
 
-        entityDiv.classList = `entity--${entity.type}`;
-        entityDiv.style.top = cX + "px";
-        entityDiv.style.left = cY + "px";
+        app.$entityBox.appendChild(entityDiv);
     }
 }
 
