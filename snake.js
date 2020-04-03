@@ -203,11 +203,17 @@ function buildGameArenaEntitiesObject(obj) {
     obj.forEach(o => {
         switch (o.type) {
             case "wallBrick": {
-                o.colorSequence = createSequence();
+                const [model, ids] = extractWallsShorthand(o);
+                ids.map(id => {
+                    // check if no entity is on row, col
+                    if (entities[id]) throw new Error(`Wall Error: Tried to place wall ${o.bluePrint} on occupied area! ${JSON.stringify(entities[id])}`);
+                });
+                entities[ids[0]] = { type: o.type, model: model, colorSequence: createSequence() }
                 extractWallsShorthand(o);
             }
         } // end of switch game entity object type
     });
+
     return entities;
 }
 
@@ -220,7 +226,7 @@ function extractWallsShorthand(wallObj) {
     const chunks = wallObj.bluePrint.toUpperCase().split(".");
     if (chunks.length < 3) throw new Error("Wall Error: Badly separated blue-print expression!\t" + wallObj.bluePrint);
     const [row, col, ...descriptors] = chunks;
-    console.log(row, col, descriptors);
+    const coordinates = [[row, col]]; // it will be extended if length > 1
 
     // check rows and colums
     if (isNaN(!parseInt(row)) || isNaN(!parseInt(col))) throw new Error("First two items separated by periods represents the row and column and they must be numbers!\t" + row + " " + col);
@@ -232,30 +238,50 @@ function extractWallsShorthand(wallObj) {
     if (!/^(V|H)\d+$/g.test(descriptors[0])) throw new Error("Wall Error: descriptor 1 must contain 1 letter (V|H) followed by only numbers!\t" + descriptors[0]);
 
     descriptors[0] = descriptors[0].match(/^(V|H)|\d+$/g);
-    const [direction, length] = [descriptors[0][0] === "H" ? "horizontal" : "vertical", descriptors[0][1]];
+    const [direction, length] = [descriptors[0][0] === "H" ? "horizontal" : "vertical", Number(descriptors[0][1])];
     if (length < 1) throw new Error("Wall Error: length must be greater than 0!\t" + length);
     if (direction === "horizontal" && row + length > app.level.dimension.rows - 1) throw new Error("Wall Error: Wall length is extending wall rows range!\t" + wallObj.bluePrint);
     if (direction === "vertical" && col + length > app.level.dimension.cols - 1) throw new Error("Wall Error: Wall length is extending wall colums range!\t" + wallObj.bluePrint);
 
     let startJoint = endJoint = undefined; // shape (L|T|X) if L direction: (N|E|S|W) closure: [0|1 * 4]
-    // get joint if length is 1
-    if (Number(length) === 1) {
+
+    if (length === 1) {
         // case no joint -> full closure
-        if (descriptors.length === 1 || descriptors[1] === "C") startJoint = { closure: [1, 1, 1, 1] };                         // H17 | H17C
+        if (descriptors.length === 1 || descriptors[1] === "C") startJoint = { closure: [1, 1, 1, 1] };                         // H1 | H1C
         // case fully open 
-        else if (descriptors[1] === "O") startJoint = { closure: [0, 0, 0, 0] };                                                // H17.O
+        else if (descriptors[1] === "O") startJoint = { closure: [0, 0, 0, 0] };                                                // V1.O
         // case custom closing lines 
-        else if (/^(O|C){4}$/g.test(descriptors[1])) startJoint = { closure: [...descriptors[1]].map(d => d === "C" ? 1 : 0) }; // H17.OCCO
+        else if (/^(O|C){4}$/g.test(descriptors[1])) startJoint = { closure: [...descriptors[1]].map(d => d === "C" ? 1 : 0) }; // V1.OCCO
         else throw new Error("Wall Error: Badly constructed blue-print!\t" + wallObj.bluePrint);
     }
 
-    const model = {
+    if (length === 2) {
+        // case no joint -> full closure
+        if (descriptors.length === 1 || descriptors[1] === "C") startJoint = { closure: [1, 1, 1, 1, 1, 1] };                   // V2 | V2C
+        // case fully open 
+        else if (descriptors[1] === "O") startJoint = { closure: [0, 0, 0, 0, 0, 0] };                                          // V2.O
+        // case custom closing lines 
+        else if (/^(O|C){6}$/g.test(descriptors[1])) startJoint = { closure: [...descriptors[1]].map(d => d === "C" ? 1 : 0) }; // V2.OCCOCC
+        else if (descriptors[1][0] === "T") throw new Error("Wall Error: Wall with length 2 can not have T joint!\t" + wallObj.bluePrint);
+        else if (descriptors[1][0] === "L" || descriptors[1][0] === "T") {
+            const [shape, shapeDirection] = [descriptors[0][1], descriptors[1][1]];
+            if (!/(N|E|S|W)/.test(shapeDirection)) throw new Error("Wall Error: Invalid shape direction!\t" + wallObj.bluePrint);
+        }
+        else throw new Error("Wall Error: Badly constructed blue-print!\t" + wallObj.bluePrint);
+    }
+
+    // check if all coordinates are within map range
+    if (coordinates.some(c => (c[0] > app.level.dimension.rows - 1 || c[1] > app.level.dimension.cols - 1))) throw new Error("Wall Error: created wall is out of map range!\t" + wallObj.bluePrint);
+
+    const ids = coordinates.map(c => `r${c[0]}c${c[1]}`);
+
+    return [{
         direction: direction,
         length: length,
         startJoint: startJoint,
-        endJoint: endJoint
-    }
-    console.log(model);
+        endJoint: endJoint,
+        blueprint: wallObj.bluePrint,
+    }, ids];
 }
 
 
@@ -497,9 +523,7 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
                 break;
             }
             case "wallBrick": {
-                const model = translateWallModelSyntax(entity.model, rowOnMap, colOnMap);
-
-                if (model.singleBlock) drawSingleWallBlock(entityDiv, entity, model);
+                if (entity.model.length === 1) drawSingleWallBlock(entityDiv, entity);
                 break;
             }
         } // end of switch entity type
@@ -573,7 +597,8 @@ const getBrickColor = (n, e) => arena.brickColorSequence[e.colorSequence[n % are
 
 
 
-function drawSingleWallBlock(div, entity, model) {
+function drawSingleWallBlock(div, entity) {
+    const model = entity.model;
     const l = app.gameTableCellLength;
     const svg = createSvg({ width: l, height: l });
     const c1 = "rgba(255, 255, 255, 0.9)";
@@ -602,19 +627,19 @@ function drawSingleWallBlock(div, entity, model) {
         line8 = svgDraw("line", { x1: l / 3 * 2, x2: l, y1: l / 2, y2: l / 2, stroke: c2, "stroke-width": 1 });
     }
 
-    if (!model.singleBlockOpenSides[0]) {
+    if (model.startJoint.closure[0]) {
         line1 = svgDraw("line", { x1: 0, x2: l, y1: 0, y2: 0, stroke: c1, "stroke-width": 2 });
         svg.appendChild(line1);
     }
-    if (!model.singleBlockOpenSides[1]) {
+    if (model.startJoint.closure[1]) {
         line2 = svgDraw("line", { x1: l, x2: l, y1: 0, y2: l, stroke: c1, "stroke-width": 2 });
         svg.appendChild(line2);
     }
-    if (!model.singleBlockOpenSides[2]) {
+    if (model.startJoint.closure[2]) {
         line3 = svgDraw("line", { x1: 0, x2: l, y1: l, y2: l, stroke: c1, "stroke-width": 2 });
         svg.appendChild(line3);
     }
-    if (!model.singleBlockOpenSides[3]) {
+    if (model.startJoint.closure[3]) {
         line4 = svgDraw("line", { x1: 0, x2: 0, y1: 0, y2: l, stroke: c1, "stroke-width": 2 });
         svg.appendChild(line4);
     }
