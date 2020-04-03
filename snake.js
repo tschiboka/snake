@@ -183,6 +183,7 @@ function buildGameArenaEntitiesObject(obj) {
         if (coord.length !== 2) throw new Error("Game characters coordinates must have 2 items!", + coord);
         if (isNaN(parseInt(coord[0])) || isNaN(parseInt(coord[1]))) throw new Error("Game characters coordinate must be a number! " + coord);
         // coordinates must be in the range of the map
+        if (coord[0] < 0 || coord[1] < 0) throw new Error("Game character is out of game maps range! ", coord);
         if (coord[0] > app.level.dimension.rows - 1 || coord[1] > app.level.dimension.cols - 1) throw new Error("Game character is out of game maps range! ", coord);
         // choordinates must connect to the previous element
         if (i !== 0) { // first ind [0] has no previous connenction
@@ -214,25 +215,47 @@ function buildGameArenaEntitiesObject(obj) {
 
 // Most of the wall object represent many wall bricks, and condensed into a few char syntax
 function extractWallsShorthand(wallObj) {
+    // extract row, col, model: (hor|ver, length, joints, directions, closures)
     if (!wallObj.bluePrint || typeof wallObj.bluePrint !== "string") throw new Error("Wall Model: Wall blue print must be declared and it must be a string!\t" + JSON.stringify(wallObj));
-    const chunks = wallObj.model.toUpperCase().split(".");
+    const chunks = wallObj.bluePrint.toUpperCase().split(".");
+    if (chunks.length < 3) throw new Error("Wall Error: Badly separated blue-print expression!\t" + wallObj.bluePrint);
+    const [row, col, ...descriptors] = chunks;
+    console.log(row, col, descriptors);
 
-    if (chunks.length < 2) throw new Error("Wall Error: Badly separated model expression!\t" + wallObj.model);
-    // check direction
-    if (chunks[0][0] !== "H" && chunks[0][0] !== "V") throw new Error("Wall Model: First character must be V or H!\t" + wallObj.model);
-    // check length
-    if (chunks[0][1] < 1) throw new Error("Wall Model: length must be greater than 0!\t" + wallObj.model);
-    if (isNaN(chunks[0][1])) throw new Error("Wall Model: Second character must be a number!\t" + wallObj.model);
+    // check rows and colums
+    if (isNaN(!parseInt(row)) || isNaN(!parseInt(col))) throw new Error("First two items separated by periods represents the row and column and they must be numbers!\t" + row + " " + col);
+    if (row < 0 || col < 0) throw new Error("Wall Error: row or column is out of the range of the game level map\t" + row + " " + col);
+    if (row > app.level.dimension.rows - 1 || col > app.level.dimension.cols - 1) throw new Error("Wall Error: row or column is out of the range of the game level map\t" + row + " " + col);
 
-    const direction = chunks[0][0] === "H" ? "horizontal" : "vertical";
-    const length = Number(chunks[0].match(/\d+/g));
+    // check descriptors 1 (wall direction, length) 
+    if (descriptors[0][0] !== "H" && descriptors[0][0] !== "V") throw new Error("Wall Error: First character after coordinates must be V or H!\t" + wallObj.model);
+    if (!/^(V|H)\d+$/g.test(descriptors[0])) throw new Error("Wall Error: descriptor 1 must contain 1 letter (V|H) followed by only numbers!\t" + descriptors[0]);
 
-    // check if object is in the range of the level map
-    if (direction === "horizontal" && wallObj.col + length >= app.level.dimension.cols) throw new Error("Wall Model: wall extending out of the range of map!" + wallObj.model);
-    if (direction === "vertical" && wallObj.row + length >= app.level.dimension.rows) throw new Error("Wall Model: wall extending out of the range of map!" + wallObj.model);
+    descriptors[0] = descriptors[0].match(/^(V|H)|\d+$/g);
+    const [direction, length] = [descriptors[0][0] === "H" ? "horizontal" : "vertical", descriptors[0][1]];
+    if (length < 1) throw new Error("Wall Error: length must be greater than 0!\t" + length);
+    if (direction === "horizontal" && row + length > app.level.dimension.rows - 1) throw new Error("Wall Error: Wall length is extending wall rows range!\t" + wallObj.bluePrint);
+    if (direction === "vertical" && col + length > app.level.dimension.cols - 1) throw new Error("Wall Error: Wall length is extending wall colums range!\t" + wallObj.bluePrint);
 
-    console.log(chunks);
+    let startJoint = endJoint = undefined; // shape (L|T|X) if L direction: (N|E|S|W) closure: [0|1 * 4]
+    // get joint if length is 1
+    if (Number(length) === 1) {
+        // case no joint -> full closure
+        if (descriptors.length === 1 || descriptors[1] === "C") startJoint = { closure: [1, 1, 1, 1] };                         // H17 | H17C
+        // case fully open 
+        else if (descriptors[1] === "O") startJoint = { closure: [0, 0, 0, 0] };                                                // H17.O
+        // case custom closing lines 
+        else if (/^(O|C){4}$/g.test(descriptors[1])) startJoint = { closure: [...descriptors[1]].map(d => d === "C" ? 1 : 0) }; // H17.OCCO
+        else throw new Error("Wall Error: Badly constructed blue-print!\t" + wallObj.bluePrint);
+    }
 
+    const model = {
+        direction: direction,
+        length: length,
+        startJoint: startJoint,
+        endJoint: endJoint
+    }
+    console.log(model);
 }
 
 
@@ -527,53 +550,6 @@ function moveCharacter(row, col) {
 /*##################################################################################################
   ###################################  SVG DRAWING FUNCTIONS  ######################################
   ##################################################################################################*/
-
-
-/*  Wall model naming syntax: (DIRECTION, LENGTH, START_JOINT, END_JOINT) eg: H5.LNC.TSONE
-    DIRECTION: (H|V) - horizontal / vertical
-    LENGTH: (+int && pos + int <= map size)
-    JOINTS: (joint type, direction, isOpen)
-        joint type: (L|T|X) L shape / T shape / + shape / closed / open (X, T does not need direction)
-        joint direction: (N|E|S|W) north, east, south, west (closed does not need direction)
-        V3.LW.XC eg vertical wall of length 3 starts with an L shaped joint open in South 
-        and West and ends in a + shaped joint closed in all direction*/
-function translateWallModelSyntax(modelStr, rowOnMap, colOnMap) {
-    const model = {
-        direction: "",
-        length: 1,
-        singleBlock: false,              // is a single brick
-        singleBlockOpenSides: undefined, // [N, E, S, W]
-    };
-    const chunks = modelStr.toUpperCase().split(".");
-
-    model.direction = chunks[0][0] === "H" ? "horizontal" : "vertical";
-
-    const length = Number(chunks[0].match(/\d+/g));
-
-    // if length is 1
-    if (length == 1) {
-        // if only joint is C (closed all sides)
-        if (chunks[1].length === 1 && chunks[1][0] === "C") {
-            model.singleBlock = true;
-            model.singleBlockOpenSides = [0, 0, 0, 0];
-        }
-        // if only joint is O (open all sides)
-        else if (chunks[1].length === 1 && chunks[1][0] === "O") {
-            model.singleBlock = true;
-            model.singleBlockOpenSides = [1, 1, 1, 1];
-        }
-        else if (chunks[1].match(/^[OC]{4}$/g)) {
-            model.singleBlock = true;
-            model.singleBlockOpenSides = [...chunks[1]].map(ch => ch === "C" ? 0 : 1);
-        }
-        else if (chunks[1].length !== 4) throw new Error("Wall Model: illegal property for character with length 1.\t" + modelStr);
-    }
-    if (length > 1) {
-        // check if length over reaches map edges
-        console.log(rowOnMap, colOnMap);
-    }
-    return model;
-}
 
 
 
