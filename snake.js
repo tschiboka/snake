@@ -209,9 +209,37 @@ function buildGameArenaEntitiesObject(obj) {
 
     // walls have different set of colorSequence
     const createSequence = () => new Array(10).fill(1).map(n => n * Math.floor(Math.random() * 10));
-    obj.forEach(o => { if (entities[`r${o.row}c${o.col}`].type === "wallBrick") { entities[`r${o.row}c${o.col}`].colorSequence = createSequence(); } });
+    obj.forEach(o => {
+        if (entities[`r${o.row}c${o.col}`].type === "wallBrick") {
+            entities[`r${o.row}c${o.col}`].colorSequence = createSequence();
+            extractMultipleLengthWalls(o);
+        }
+    });
 
     return entities;
+}
+
+
+
+// Most of the wall object represent many wall bricks, and condensed into a few char syntax
+function extractMultipleLengthWalls(wallObj) {
+    if (!wallObj.model || typeof wallObj.model !== "string") throw new Error("Wall Model: model must be declared and it must be a string!" + JSON.stringify(wallObj));
+    const chunks = wallObj.model.toUpperCase().split(".");
+
+    if (chunks.length < 2) throw new Error("Wall Error: Badly separated model expression!\t" + wallObj.model);
+    // check direction
+    if (chunks[0][0] !== "H" && chunks[0][0] !== "V") throw new Error("Wall Model: First character must be V or H!\t" + wallObj.model);
+    // check length
+    if (chunks[0][1] < 1) throw new Error("Wall Model: length must be greater than 0!\t" + wallObj.model);
+    if (isNaN(chunks[0][1])) throw new Error("Wall Model: Second character must be a number!\t" + wallObj.model);
+
+    const direction = chunks[0][0] === "H" ? "horizontal" : "vertical";
+    const length = Number(chunks[0].match(/\d+/g));
+
+    // check if object is in the range of the level map
+    if (direction === "horizontal" && wallObj.col + length >= app.level.dimension.cols) throw new Error("Wall Model: wall extending out of the range of map!" + wallObj.model);
+    if (direction === "vertical" && wallObj.row + length >= app.level.dimension.rows) throw new Error("Wall Model: wall extending out of the range of map!" + wallObj.model);
+
 }
 
 
@@ -453,7 +481,7 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
                 break;
             }
             case "wallBrick": {
-                const model = translateWallModelSyntax(entity.model);
+                const model = translateWallModelSyntax(entity.model, rowOnMap, colOnMap);
 
                 if (model.singleBlock) drawSingleWallBlock(entityDiv, entity, model);
                 break;
@@ -512,12 +540,11 @@ function moveCharacter(row, col) {
     DIRECTION: (H|V) - horizontal / vertical
     LENGTH: (+int && pos + int <= map size)
     JOINTS: (joint type, direction, isOpen)
-        joint type: (L|T|X|C|O) L shape / T shape / + shape / closed / open (X does not need direction)
+        joint type: (L|T|X) L shape / T shape / + shape / closed / open (X, T does not need direction)
         joint direction: (N|E|S|W) north, east, south, west (closed does not need direction)
-        H3.TOSW.XC eg horizontal wall of length 3 starts with a T shaped joint open in South 
-                      and West and ends in a + shaped joint closed in all direction
-*/
-function translateWallModelSyntax(modelStr) {
+        V3.LW.XC eg vertical wall of length 3 starts with an L shaped joint open in South 
+        and West and ends in a + shaped joint closed in all direction*/
+function translateWallModelSyntax(modelStr, rowOnMap, colOnMap) {
     const model = {
         direction: "",
         length: 1,
@@ -526,23 +553,18 @@ function translateWallModelSyntax(modelStr) {
     };
     const chunks = modelStr.toUpperCase().split(".");
 
-    if (chunks.length < 2) throw new Error("Wall Error: Badly separated model expression!\t" + modelStr);
-
-    // get direction
-    if (chunks[0][0] !== "H" && chunks[0][0] !== "V") throw new Error("Wall Model: First character must be V or H!\t" + modelStr);
     model.direction = chunks[0][0] === "H" ? "horizontal" : "vertical";
 
-    console.log(chunks[0][1])
-    // get length
-    if (chunks[0][1] < 1) throw new Error("Wall Model: length must be greater than 0!\t" + modelStr);
-    if (isNaN(chunks[0][1])) throw new Error("Wall Model: Second character must be a number!\t" + modelStr);
+    const length = Number(chunks[0].match(/\d+/g));
+
     // if length is 1
-    else if (chunks[0][1] == 1) {
-        // if only joint is C
+    if (length == 1) {
+        // if only joint is C (closed all sides)
         if (chunks[1].length === 1 && chunks[1][0] === "C") {
             model.singleBlock = true;
             model.singleBlockOpenSides = [0, 0, 0, 0];
         }
+        // if only joint is O (open all sides)
         else if (chunks[1].length === 1 && chunks[1][0] === "O") {
             model.singleBlock = true;
             model.singleBlockOpenSides = [1, 1, 1, 1];
@@ -552,6 +574,10 @@ function translateWallModelSyntax(modelStr) {
             model.singleBlockOpenSides = [...chunks[1]].map(ch => ch === "C" ? 0 : 1);
         }
         else if (chunks[1].length !== 4) throw new Error("Wall Model: illegal property for character with length 1.\t" + modelStr);
+    }
+    if (length > 1) {
+        // check if length over reaches map edges
+        console.log(rowOnMap, colOnMap);
     }
     return model;
 }
@@ -591,7 +617,6 @@ function drawSingleWallBlock(div, entity, model) {
         rect3 = svgDraw("rect", { x: 0, y: l / 3, width: l, height: l / 3, fill: getBrickColor(2, entity) });
         rect4 = svgDraw("rect", { x: 0, y: l / 3 * 2, width: l / 2, height: l / 3, fill: getBrickColor(3, entity) });
         rect5 = svgDraw("rect", { x: l / 2, y: l / 3 * 2, width: l / 2, height: l / 3, fill: getBrickColor(4, entity) });
-
         line5 = svgDraw("line", { x1: 0, x2: l, y1: l / 3, y2: l / 3, stroke: c2, "stroke-width": 1 });
         line6 = svgDraw("line", { x1: 0, x2: l, y1: l / 3 * 2, y2: l / 3 * 2, stroke: c2, "stroke-width": 1 });
         line7 = svgDraw("line", { x1: l / 2, x2: l / 2, y1: 0, y2: l / 3, stroke: c2, "stroke-width": 1 });
@@ -602,7 +627,6 @@ function drawSingleWallBlock(div, entity, model) {
         rect3 = svgDraw("rect", { x: l / 3 * 2, y: 0, width: l / 3, height: l / 2, fill: getBrickColor(2, entity) });
         rect4 = svgDraw("rect", { x: 0, y: l / 2, width: l / 3, height: l / 2, fill: getBrickColor(3, entity) });
         rect5 = svgDraw("rect", { x: l / 3 * 2, y: l / 2, width: l / 3, height: l / 2, fill: getBrickColor(4, entity) });
-
         line5 = svgDraw("line", { x1: l / 3, x2: l / 3, y1: 0, y2: l, stroke: c2, "stroke-width": 1 });
         line6 = svgDraw("line", { x1: l / 3 * 2, x2: l / 3 * 2, y1: 0, y2: l, stroke: c2, "stroke-width": 1 });
         line7 = svgDraw("line", { x1: 0, x2: l / 3, y1: l / 2, y2: l / 2, stroke: c2, "stroke-width": 1 });

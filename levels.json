@@ -1,8 +1,8 @@
 [
     {
         "dimension": {
-            "rows": 100,
-            "cols": 100
+            "rows": 10,
+            "cols": 10
         },
         "gameCharacterDirection": "down",
         "gameCharacterCoords": [
@@ -54,7 +54,7 @@
             },
             {
                 "type": "wallBrick",
-                "model": "V1.C",
+                "model": "H5.C",
                 "row": 2,
                 "col": 4
             },
@@ -68,6 +68,12 @@
                 "type": "wallBrick",
                 "model": "V1.CCCO",
                 "row": 2,
+                "col": 8
+            },
+            {
+                "type": "wallBrick",
+                "model": "V2.CCCO.LEO",
+                "row": 4,
                 "col": 8
             }
         ]
