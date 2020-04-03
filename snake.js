@@ -120,40 +120,14 @@ function handleKeypress(e) {
 
 // Start of the application on body onload
 function start() {
-    getLevels();
+    app.levels = levels;
     setLevelNumFromLocalStorage();
 
     // the timer responsible for animation at the start of the app
     const introTimer = setInterval(() => {
         --app.introDuration;
-        if (!app.introDuration) {
-            if (app.loadLevelsState === "success") {
-                clearInterval(introTimer);
-                startGame();
-            }
-            else if (app.loadLevelsState === "error") {
-                clearInterval(introTimer);
-                throw new Error("Levels couls not be loaded!");
-            }
-            else ++app.introDuration; // wait an other sec 
-        }
+        if (!app.introDuration) { clearInterval(introTimer); startGame(); }
     }, 1000);
-}
-
-
-
-// Load levels.json into app.levels, and set app.loadLevelState from "pending" to ("success" | "error")
-async function getLevels() {
-    try {
-        const levelsJSON = await fetch("levels.json");
-        const levels = await levelsJSON.json();
-        app.loadLevelsState = "success";
-        app.levels = levels;
-    }
-    catch (exp) {
-        app.loadLevelsState = "error";
-        throw new Error(exp);
-    }
 }
 
 
@@ -198,32 +172,49 @@ function startLevel() {
 
 function buildGameArenaEntitiesObject(obj) {
     // create an emtpty 2D array
-    //let entities = Array(app.level.dimension.rows).fill().map(() => Array(app.level.dimension.cols).fill());
     let entities = {};
 
-    // objects in the map area
-    obj.forEach(o => { entities[`r${o.row}c${o.col}`] = { type: o.type, model: o.model }; });
-
-    // game character
-    app.level.gameCharacterCoords.map((coord, i) => entities[`r${coord[0]}c${coord[1]}`] = { type: (i === 0 ? "charHead" : "charBody"), index: i });
-
-    // walls have different set of colorSequence
-    const createSequence = () => new Array(10).fill(1).map(n => n * Math.floor(Math.random() * 10));
-    obj.forEach(o => {
-        if (entities[`r${o.row}c${o.col}`].type === "wallBrick") {
-            entities[`r${o.row}c${o.col}`].colorSequence = createSequence();
-            extractMultipleLengthWalls(o);
+    // check if game character has all properties set properly and build them into game entities
+    if (!app.level.gameCharacterCoords) throw new Error("Levels gameCharacterCoords property has not been defined! " + JSON.stringify(app.level));
+    if (!Array.isArray(app.level.gameCharacterCoords)) throw new Error("Levels gameCharacterCoords property most be an array " + app.level.gameCharacterCoords);
+    if (app.level.gameCharacterCoords.length < 4) throw new Error("Levels gameCharacterCoords property must have at least 4 items! Only found " + app.level.gameCharacterCoords.length + ".");
+    app.level.gameCharacterCoords.map((coord, i, coordArr) => {
+        if (!Array.isArray(coord)) throw new Error("Levels gameCharacter properties items must be all arrays! " + coord);
+        if (coord.length !== 2) throw new Error("Game characters coordinates must have 2 items!", + coord);
+        if (isNaN(parseInt(coord[0])) || isNaN(parseInt(coord[1]))) throw new Error("Game characters coordinate must be a number! " + coord);
+        // coordinates must be in the range of the map
+        if (coord[0] > app.level.dimension.rows - 1 || coord[1] > app.level.dimension.cols - 1) throw new Error("Game character is out of game maps range! ", coord);
+        // choordinates must connect to the previous element
+        if (i !== 0) { // first ind [0] has no previous connenction
+            const connectR = connectC = false;
+            const prevR = coordArr[i - 1][0];
+            const prevC = coordArr[i - 1][1];
+            if (Math.abs(coord[0] - prevR) === 1 && coord[1] === prevC) connectR = true;
+            if (Math.abs(coord[1] - prevC) === 1 && coord[0] === prevR) connectC = true;
+            if (!connectR && !connectC) throw new Error("Character coordinates must have a connection either on a row or a column! " + coord + " " + coordArr[i - 1]);
         }
+        return entities[`r${coord[0]}c${coord[1]}`] = { type: (i === 0 ? "charHead" : "charBody"), index: i }
     });
 
+    // Game objs can have different set of random colors.
+    // Colors defined here, in level obj building func, thus they won't change with each redrawal of game table
+    const createSequence = () => new Array(10).fill(1).map(n => n * Math.floor(Math.random() * 10));
+    obj.forEach(o => {
+        switch (o.type) {
+            case "wallBrick": {
+                o.colorSequence = createSequence();
+                extractWallsShorthand(o);
+            }
+        } // end of switch game entity object type
+    });
     return entities;
 }
 
 
 
 // Most of the wall object represent many wall bricks, and condensed into a few char syntax
-function extractMultipleLengthWalls(wallObj) {
-    if (!wallObj.model || typeof wallObj.model !== "string") throw new Error("Wall Model: model must be declared and it must be a string!" + JSON.stringify(wallObj));
+function extractWallsShorthand(wallObj) {
+    if (!wallObj.bluePrint || typeof wallObj.bluePrint !== "string") throw new Error("Wall Model: Wall blue print must be declared and it must be a string!\t" + JSON.stringify(wallObj));
     const chunks = wallObj.model.toUpperCase().split(".");
 
     if (chunks.length < 2) throw new Error("Wall Error: Badly separated model expression!\t" + wallObj.model);
@@ -239,6 +230,8 @@ function extractMultipleLengthWalls(wallObj) {
     // check if object is in the range of the level map
     if (direction === "horizontal" && wallObj.col + length >= app.level.dimension.cols) throw new Error("Wall Model: wall extending out of the range of map!" + wallObj.model);
     if (direction === "vertical" && wallObj.row + length >= app.level.dimension.rows) throw new Error("Wall Model: wall extending out of the range of map!" + wallObj.model);
+
+    console.log(chunks);
 
 }
 
