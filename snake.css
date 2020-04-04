@@ -89,7 +89,7 @@ body {
 
 .game__box table tr td {
     border: 1px solid #111214; /* fallback for browsers without rgba borders */
-    border: 1px solid #11121486; 
+    border: 1px solid #11121460; 
     color: white;
     font-size: 14px;
     text-align: center;

@@ -204,16 +204,29 @@ function buildGameArenaEntitiesObject(obj) {
         switch (o.type) {
             case "wallBrick": {
                 const [model, ids] = extractWallsShorthand(o);
-                ids.map((id, i) => {
+                ids.map((id, i, idsArr) => {
+                    modifiedModel = { ...model };
                     // check if no entity is on row, col
                     if (entities[id]) throw new Error(`Wall Error: Tried to place wall ${o.bluePrint} on occupied area! ${JSON.stringify(entities[id])}`);
-                    i === 0 ? entities[id] = { type: o.type, model: model, colorSequence: createSequence() } : entities[id] = { type: o.type };
+
+                    // set longer walls closures
+                    if (idsArr.length > 1) {
+                        if (model.direction === "horizontal") {
+                            if (i === 0) modifiedModel.closure = [1, 0, 1, model.closure[1]];
+                            else if (i === idsArr.length - 1) modifiedModel.closure = [1, model.closure[1], 1, 0];
+                            else modifiedModel.closure = [1, 0, 1, 0];
+                        }
+                        if (model.direction === "vertical") {
+                            if (i === 0) modifiedModel.closure = [model.closure[0], 1, 0, 1];
+                            else if (i === idsArr.length - 1) modifiedModel.closure = [0, 1, model.closure[0], 1];
+                            else modifiedModel.closure = [0, 1, 0, 1];
+                        }
+                    }
+                    entities[id] = { type: o.type, model: modifiedModel || model, colorSequence: createSequence() };
                 });
             }
         } // end of switch game entity object type
     });
-
-    console.log(entities);
 
     return entities;
 }
@@ -222,13 +235,13 @@ function buildGameArenaEntitiesObject(obj) {
 
 // Most of the wall object represent many wall bricks, and condensed into a few char syntax
 function extractWallsShorthand(wallObj) {
-    // extract row, col, model: (hor|ver, length, joints, directions, closures)
+    // extract row, col, model: (hor|ver, closures)
     if (!wallObj.bluePrint || typeof wallObj.bluePrint !== "string") throw new Error("Wall Model: Wall blue print must be declared and it must be a string!\t" + JSON.stringify(wallObj));
     const chunks = wallObj.bluePrint.toUpperCase().split(".");
 
     if (chunks.length < 3) throw new Error("Wall Error: Badly separated blue-print expression!\t" + wallObj.bluePrint);
     let [row, col, ...descriptors] = chunks;
-    row = Number(row); lol = Number(col);
+    row = Number(row); col = Number(col);
     const coordinates = [[row, col]]; // it will be extended if length > 1
 
     // check rows and colums
@@ -243,47 +256,48 @@ function extractWallsShorthand(wallObj) {
     descriptors[0] = descriptors[0].match(/^(V|H)|\d+$/g);
     const [direction, length] = [descriptors[0][0] === "H" ? "horizontal" : "vertical", Number(descriptors[0][1])];
     if (length < 1) throw new Error("Wall Error: length must be greater than 0!\t" + length);
-    if (direction === "horizontal" && col + length > app.level.dimension.cols - 1) throw new Error("Wall Error: Wall length is extending wall columns range!\t" + wallObj.bluePrint);
-    if (direction === "vertical" && row + length > app.level.dimension.rows - 1) throw new Error("Wall Error: Wall length is extending wall rows range!\t" + wallObj.bluePrint);
+    if (direction === "horizontal" && col + length > app.level.dimension.cols) throw new Error("Wall Error: Wall length is extending wall columns range!\t" + wallObj.bluePrint);
+    if (direction === "vertical" && row + length > app.level.dimension.rows) throw new Error("Wall Error: Wall length is extending wall rows range!\t" + wallObj.bluePrint);
 
-    let startJoint = endJoint = undefined; // shape (L|T|X) if L direction: (N|E|S|W) closure: [0|1 * 4]
+    let closure = undefined;
 
     if (length === 1) {
         // case no joint -> full closure
-        if (descriptors.length === 1 || descriptors[1] === "C") startJoint = { closure: [1, 1, 1, 1] };                         // H1 | H1C
+        if (descriptors.length === 1 || descriptors[1] === "C") closure = [1, 1, 1, 1];                         // H1 | H1C
         // case fully open 
-        else if (descriptors[1] === "O") startJoint = { closure: [0, 0, 0, 0] };                                                // V1.O
+        else if (descriptors[1] === "O") closure = [0, 0, 0, 0];                                                // V1.O
         // case custom closing lines 
-        else if (/^(O|C){4}$/g.test(descriptors[1])) startJoint = { closure: [...descriptors[1]].map(d => d === "C" ? 1 : 0) }; // V1.OCCO
+        else if (/^(O|C){4}$/g.test(descriptors[1])) closure = [...descriptors[1]].map(d => d === "C" ? 1 : 0); // V1.OCCO
         else throw new Error("Wall Error: Badly constructed blue-print!\t" + wallObj.bluePrint);
     }
 
-    if (length === 2) {
+    if (length > 1) {
+        // fill up coordinates
+        new Array(length - 1)                                                                                        // create arr of length
+            .fill()
+            .map((_, i) => (direction === "horizontal" ? col : row) + 1 + i)                                         // increment row | col num
+            .map(newCord => { coordinates.push(direction === "horizontal" ? [row, newCord] : [newCord, col]) });     // push coord according to direction
+
         // case no joint -> full closure
-        if (descriptors.length === 1 || descriptors[1] === "C") startJoint = { closure: [1, 1, 1, 1, 1, 1] };                   // V2 | V2C
+        if (descriptors.length === 1 || descriptors[1] === "C") closure = [1, 1];                               // H2 | H2C
         // case fully open 
-        else if (descriptors[1] === "O") startJoint = { closure: [0, 0, 0, 0, 0, 0] };                                          // V2.O
+        else if (descriptors[1] === "O") closure = [0, 0];                                                      // V1.O
         // case custom closing lines 
-        else if (/^(O|C){6}$/g.test(descriptors[1])) startJoint = { closure: [...descriptors[1]].map(d => d === "C" ? 1 : 0) }; // V2.OCCOCC
-        if (direction === "horizontal") coordinates.push([row, col + 1]);
-        if (direction === "vertical") coordinates.push([row + 1, col]);
-        // get closures
+        else if (/^(O|C){2}$/g.test(descriptors[1])) closure = [...descriptors[1]].map(d => d === "C" ? 1 : 0);  // V1.OC 
+        else throw new Error("Wall Error: Badly constructed blue-print!\t" + wallObj.bluePrint);
     }
 
-    const ids = coordinates.map(c => `r${c[0]}c${c[1]}`);
     // check if all coordinates are within map range
-    console.log(ids, wallObj.bluePrint);
     if (coordinates.some(c => (c[0] > app.level.dimension.rows - 1 || c[1] > app.level.dimension.cols - 1 || c[0] < 0 || c[1] < 0))) {
         throw new Error("Wall Error: created wall is out of map range!\t" + wallObj.bluePrint);
     }
 
+    const ids = coordinates.map(c => `r${c[0]}c${c[1]}`);
 
     return [{
         direction: direction,
-        length: length,
-        startJoint: startJoint,
-        endJoint: endJoint,
         blueprint: wallObj.bluePrint,
+        closure: closure,
     }, ids];
 }
 
@@ -526,10 +540,7 @@ function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, ch
                 break;
             }
             case "wallBrick": {
-                if (entity.model) {
-                    if (entity.model.length === 1) drawSingleWallBlock(entityDiv, entity);
-                    if (entity.model.length === 2) drawDoubleWallBlock(entityDiv, entity);
-                }
+                drawSingleWallBlock(entityDiv, entity);
                 break;
             }
         } // end of switch entity type
@@ -599,16 +610,16 @@ function svgDraw(shape, attrs) {
 
 
 
-const getBrickColor = (n, e) => arena.brickColorSequence[e.colorSequence[n % arena.brickColorSequence.length]] + "60"; // last + str is hex for some transparency
+const getBrickColor = (n, e) => arena.brickColorSequence[e.colorSequence[n % arena.brickColorSequence.length]] + "70"; // last + str is hex for some transparency
 
 
 
 function drawSingleWallBlock(div, entity) {
     const model = entity.model;
-    const l = app.gameTableCellLength;
+    const l = app.gameTableCellLength + 1;
     const svg = createSvg({ width: l, height: l });
-    const c1 = "rgba(255, 255, 255, 0.9)";
-    const c2 = "rgba(255, 255, 255, 0.3)";
+    const c1 = "rgba(255, 255, 255, 0.7)";
+    const c2 = "rgba(255, 255, 255, 0.25)";
     let rect1, rect2, rect3, rect4, rect5;
     let line1, line2, line3, line4, line5, line6, line7, line8;
 
@@ -623,33 +634,17 @@ function drawSingleWallBlock(div, entity) {
         line7 = svgDraw("line", { x1: l / 2, x2: l / 2, y1: 0, y2: l / 3, stroke: c2, "stroke-width": 1 });
         line8 = svgDraw("line", { x1: l / 2, x2: l / 2, y1: l / 3 * 2, y2: l, stroke: c2, "stroke-width": 1 });
     } else {
-        rect1 = svgDraw("rect", { x: 0, y: 0, width: l / 3, height: l / 2, fill: getBrickColor(0, entity) });
-        rect2 = svgDraw("rect", { x: l / 3, y: 0, width: l / 3, height: l, fill: getBrickColor(1, entity) });
-        rect3 = svgDraw("rect", { x: l / 3 * 2, y: 0, width: l / 3, height: l / 2, fill: getBrickColor(2, entity) });
-        rect4 = svgDraw("rect", { x: 0, y: l / 2, width: l / 3, height: l / 2, fill: getBrickColor(3, entity) });
-        rect5 = svgDraw("rect", { x: l / 3 * 2, y: l / 2, width: l / 3, height: l / 2, fill: getBrickColor(4, entity) });
+        rect1 = svgDraw("rect", { x: 0, y: 0, width: l / 3, height: l / 2, fill: getBrickColor(5, entity) });
+        rect2 = svgDraw("rect", { x: l / 3, y: 0, width: l / 3, height: l, fill: getBrickColor(6, entity) });
+        rect3 = svgDraw("rect", { x: l / 3 * 2, y: 0, width: l / 3, height: l / 2, fill: getBrickColor(7, entity) });
+        rect4 = svgDraw("rect", { x: 0, y: l / 2, width: l / 3, height: l / 2, fill: getBrickColor(8, entity) });
+        rect5 = svgDraw("rect", { x: l / 3 * 2, y: l / 2, width: l / 3, height: l / 2, fill: getBrickColor(9, entity) });
         line5 = svgDraw("line", { x1: l / 3, x2: l / 3, y1: 0, y2: l, stroke: c2, "stroke-width": 1 });
         line6 = svgDraw("line", { x1: l / 3 * 2, x2: l / 3 * 2, y1: 0, y2: l, stroke: c2, "stroke-width": 1 });
         line7 = svgDraw("line", { x1: 0, x2: l / 3, y1: l / 2, y2: l / 2, stroke: c2, "stroke-width": 1 });
         line8 = svgDraw("line", { x1: l / 3 * 2, x2: l, y1: l / 2, y2: l / 2, stroke: c2, "stroke-width": 1 });
     }
 
-    if (model.startJoint.closure[0]) {
-        line1 = svgDraw("line", { x1: 0, x2: l, y1: 0, y2: 0, stroke: c1, "stroke-width": 2 });
-        svg.appendChild(line1);
-    }
-    if (model.startJoint.closure[1]) {
-        line2 = svgDraw("line", { x1: l, x2: l, y1: 0, y2: l, stroke: c1, "stroke-width": 2 });
-        svg.appendChild(line2);
-    }
-    if (model.startJoint.closure[2]) {
-        line3 = svgDraw("line", { x1: 0, x2: l, y1: l, y2: l, stroke: c1, "stroke-width": 2 });
-        svg.appendChild(line3);
-    }
-    if (model.startJoint.closure[3]) {
-        line4 = svgDraw("line", { x1: 0, x2: 0, y1: 0, y2: l, stroke: c1, "stroke-width": 2 });
-        svg.appendChild(line4);
-    }
     svg.appendChild(rect1);
     svg.appendChild(rect2);
     svg.appendChild(rect3);
@@ -659,80 +654,25 @@ function drawSingleWallBlock(div, entity) {
     svg.appendChild(line6);
     svg.appendChild(line7);
     svg.appendChild(line8);
-    div.appendChild(svg);
-}
 
-
-
-function drawDoubleWallBlock(div, entity) {
-    const model = entity.model;
-    const l = app.gameTableCellLength;
-    const c1 = "rgba(255, 255, 255, 0.9)";
-    const c2 = "rgba(255, 255, 255, 0.3)";
-    let svg;
-    let rect1, rect2, rect3, rect4, rect5, rect6, rect7, rect8;
-    let line1, line2, line3, line4, line5, line6, line7, line8, line9, line10, line11, line12, line13;
-
-    console.log(model)
-    if (model.direction === "vertical") {
-        svg = createSvg({ width: l, height: l * 2 });
-        rect1 = svgDraw("rect", { x: 0, y: 0, width: l / 3, height: l / 2, fill: getBrickColor(0, entity) });
-        rect2 = svgDraw("rect", { x: l / 3, y: 0, width: l / 3, height: l, fill: getBrickColor(1, entity) });
-        rect3 = svgDraw("rect", { x: l / 3 * 2, y: 0, width: l / 3, height: l / 2, fill: getBrickColor(2, entity) });
-        rect4 = svgDraw("rect", { x: 0, y: l / 2, width: l / 3, height: l, fill: getBrickColor(3, entity) });
-        rect5 = svgDraw("rect", { x: l / 3 * 2, y: l / 2, width: l / 3, height: l, fill: getBrickColor(4, entity) });
-        rect6 = svgDraw("rect", { x: 0, y: l * 1.5, width: l / 3, height: l / 2, fill: getBrickColor(5, entity) });
-        rect7 = svgDraw("rect", { x: l / 3, y: l, width: l / 3, height: l, fill: getBrickColor(6, entity) });
-        rect8 = svgDraw("rect", { x: l / 3 * 2, y: l * 1.5, width: l / 3, height: l / 2, fill: getBrickColor(7, entity) });
-        line7 = svgDraw("line", { x1: 0, x2: l / 3, y1: l / 2, y2: l / 2, stroke: c2, "stroke-width": 1 });
-        line8 = svgDraw("line", { x1: l / 3, x2: l / 3, y1: 0, y2: l * 2, stroke: c2, "stroke-width": 1 });
-        line9 = svgDraw("line", { x1: l / 3 * 2, x2: l / 3 * 2, y1: 0, y2: l * 2, stroke: c2, "stroke-width": 1 });
-        line10 = svgDraw("line", { x1: l / 3 * 2, x2: l, y1: l / 2, y2: l / 2, stroke: c2, "stroke-width": 1 });
-        line11 = svgDraw("line", { x1: l / 3 * 2, x2: l, y1: l * 1.5, y2: l * 1.5, stroke: c2, "stroke-width": 1 });
-        line12 = svgDraw("line", { x1: 0, x2: l / 3, y1: l * 1.5, y2: l * 1.5, stroke: c2, "stroke-width": 1 });
-        line13 = svgDraw("line", { x1: l / 3, x2: l / 3 * 2, y1: l, y2: l, stroke: c2, "stroke-width": 1 });
-
-        if (model.startJoint.closure[0]) {
-            line1 = svgDraw("line", { x1: 0, x2: l, y1: 0, y2: 0, stroke: c1, "stroke-width": 2 });
-            svg.appendChild(line1);
-        }
-        if (model.startJoint.closure[1]) {
-            line2 = svgDraw("line", { x1: l, x2: l, y1: 0, y2: l, stroke: c1, "stroke-width": 2 });
-            svg.appendChild(line2);
-        }
-        if (model.startJoint.closure[2]) {
-            line3 = svgDraw("line", { x1: l, x2: l, y1: l, y2: l * 2, stroke: c1, "stroke-width": 2 });
-            svg.appendChild(line3);
-        }
-        if (model.startJoint.closure[3]) {
-            line4 = svgDraw("line", { x1: 0, x2: l, y1: l * 2, y2: l * 2, stroke: c1, "stroke-width": 2 });
-            svg.appendChild(line4);
-        }
-        if (model.startJoint.closure[4]) {
-            line5 = svgDraw("line", { x1: 0, x2: 0, y1: l * 2, y2: l, stroke: c1, "stroke-width": 2 });
-            svg.appendChild(line5);
-        }
-        if (model.startJoint.closure[5]) {
-            line6 = svgDraw("line", { x1: 0, x2: 0, y1: l, y2: 0, stroke: c1, "stroke-width": 2 });
-            svg.appendChild(line6);
-        }
-
-        svg.appendChild(rect1);
-        svg.appendChild(rect2);
-        svg.appendChild(rect3);
-        svg.appendChild(rect4);
-        svg.appendChild(rect5);
-        svg.appendChild(rect6);
-        svg.appendChild(rect7);
-        svg.appendChild(rect8);
-        svg.appendChild(line7);
-        svg.appendChild(line8);
-        svg.appendChild(line9);
-        svg.appendChild(line10);
-        svg.appendChild(line11);
-        svg.appendChild(line12);
-        svg.appendChild(line13);
+    if (model.closure[0]) {
+        line1 = svgDraw("line", { x1: 0, x2: l, y1: 1, y2: 1, stroke: c1, "stroke-width": 2 });
+        svg.appendChild(line1);
     }
-
+    if (model.closure[1]) {
+        line2 = svgDraw("line", { x1: l - 1, x2: l - 1, y1: 0, y2: l, stroke: c1, "stroke-width": 2 });
+        svg.appendChild(line2);
+    }
+    if (model.closure[2]) {
+        line3 = svgDraw("line", { x1: 0, x2: l, y1: l - 1, y2: l - 1, stroke: c1, "stroke-width": 2 });
+        svg.appendChild(line3);
+    }
+    if (model.closure[3]) {
+        line4 = svgDraw("line", { x1: 1, x2: 1, y1: 0, y2: l - 1, stroke: c1, "stroke-width": 2 });
+        svg.appendChild(line4);
+    }
     div.appendChild(svg);
 }
+
+
+
