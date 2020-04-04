@@ -46,15 +46,15 @@ const arena = {
     tableColNum: undefined,                            // (+int) -> the displayable area expressed in table columns (coord)
     prevTableMap: undefined,                           // (arr of str)  -> if previous table coord has entity on it ("010110") (avoiding unneccesary repainting)
     gameEntities: undefined,                           // (arr of objs) -> list of objects that appears on the game map
-    entityColors: {                                    //     predifined list of the displayable colors -
-        "charHead": "rgba(134, 155, 162, 0.2)",        //     defined here in order to save computations -
-        "charBody": "rgba(134, 155, 162, 0.1)",        //     in 2d arr loop of displaying the table (can be > 1000s)
-        "crosshair": "rgba(255, 255, 255, 0.03)",
-        "wallBrick": "rgba(255, 255, 255, 0.2)",
-    },
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
     charDirection: "",                                 // (str)  -> (up|down|left|right)
+    entityColors: {                                    //     predifined list of the displayable colors -
+        "charHead": "transparent",        //     defined here in order to save computations -
+        "charBody": "transparent",                    //     in 2d arr loop of displaying the table (can be > 1000s)
+        "crosshair": "rgba(255, 255, 255, 0.03)",
+        "wallBrick": "rgba(255, 255, 255, 0.2)",
+    },
     brickColorSequence: [                              // (arr)  -> colors of random individual brick colors
         "#b3a432", "#9c8128", "#ab752b", "#d9a662",
         "#d99062", "#d97862", "#e35839", "#e33f39",
@@ -212,14 +212,14 @@ function buildGameArenaEntitiesObject(obj) {
                     // set longer walls closures
                     if (idsArr.length > 1) {
                         if (model.direction === "horizontal") {
-                            if (i === 0) modifiedModel.closure = [1, 0, 1, model.closure[1]];
-                            else if (i === idsArr.length - 1) modifiedModel.closure = [1, model.closure[1], 1, 0];
-                            else modifiedModel.closure = [1, 0, 1, 0];
+                            if (i === 0) modifiedModel.closure = [model.closure[0], 0, model.closure[2], model.closure[3]];
+                            else if (i === idsArr.length - 1) modifiedModel.closure = [model.closure[0], model.closure[1], model.closure[2], 0];
+                            else modifiedModel.closure = modifiedModel.closure = [model.closure[0], 0, model.closure[2], 0];
                         }
                         if (model.direction === "vertical") {
-                            if (i === 0) modifiedModel.closure = [model.closure[0], 1, 0, 1];
-                            else if (i === idsArr.length - 1) modifiedModel.closure = [0, 1, model.closure[0], 1];
-                            else modifiedModel.closure = [0, 1, 0, 1];
+                            if (i === 0) modifiedModel.closure = [model.closure[0], model.closure[1], 0, model.closure[3]];
+                            else if (i === idsArr.length - 1) modifiedModel.closure = [0, model.closure[1], model.closure[2], model.closure[3]];
+                            else modifiedModel.closure = [0, model.closure[1], 0, model.closure[3]];
                         }
                     }
                     entities[id] = { type: o.type, model: modifiedModel || model, colorSequence: createSequence() };
@@ -261,31 +261,21 @@ function extractWallsShorthand(wallObj) {
 
     let closure = undefined;
 
-    if (length === 1) {
-        // case no joint -> full closure
-        if (descriptors.length === 1 || descriptors[1] === "C") closure = [1, 1, 1, 1];                         // H1 | H1C
-        // case fully open 
-        else if (descriptors[1] === "O") closure = [0, 0, 0, 0];                                                // V1.O
-        // case custom closing lines 
-        else if (/^(O|C){4}$/g.test(descriptors[1])) closure = [...descriptors[1]].map(d => d === "C" ? 1 : 0); // V1.OCCO
-        else throw new Error("Wall Error: Badly constructed blue-print!\t" + wallObj.bluePrint);
-    }
-
     if (length > 1) {
         // fill up coordinates
         new Array(length - 1)                                                                                        // create arr of length
             .fill()
             .map((_, i) => (direction === "horizontal" ? col : row) + 1 + i)                                         // increment row | col num
             .map(newCord => { coordinates.push(direction === "horizontal" ? [row, newCord] : [newCord, col]) });     // push coord according to direction
-
-        // case no joint -> full closure
-        if (descriptors.length === 1 || descriptors[1] === "C") closure = [1, 1];                               // H2 | H2C
-        // case fully open 
-        else if (descriptors[1] === "O") closure = [0, 0];                                                      // V1.O
-        // case custom closing lines 
-        else if (/^(O|C){2}$/g.test(descriptors[1])) closure = [...descriptors[1]].map(d => d === "C" ? 1 : 0);  // V1.OC 
-        else throw new Error("Wall Error: Badly constructed blue-print!\t" + wallObj.bluePrint);
     }
+
+    // case no joint -> full closure
+    if (descriptors.length === 1 || descriptors[1] === "C") closure = [1, 1, 1, 1];                         // H1 | H1C
+    // case fully open 
+    else if (descriptors[1] === "O") closure = [0, 0, 0, 0];                                                // V1.O
+    // case custom closing lines 
+    else if (/^(O|C){4}$/g.test(descriptors[1])) closure = [...descriptors[1]].map(d => d === "C" ? 1 : 0); // V1.OCCO
+    else throw new Error("Wall Error: Badly constructed blue-print!\t" + wallObj.bluePrint);
 
     // check if all coordinates are within map range
     if (coordinates.some(c => (c[0] > app.level.dimension.rows - 1 || c[1] > app.level.dimension.cols - 1 || c[0] < 0 || c[1] < 0))) {

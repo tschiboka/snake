@@ -6,12 +6,9 @@ const levels =
             gameCharacterCoords: [[2, 6], [2, 5], [2, 4], [2, 3]],
             gameCharacterDirection: "down",
             "objects": [
-                { type: "wallBrick", bluePrint: "2.20.V11.OC" },
-                { type: "wallBrick", bluePrint: "1.20.H1.COOC" },
-                { type: "wallBrick", bluePrint: "1.21.H3.O" },
-                { type: "wallBrick", bluePrint: "1.24.H1.CCOO" },
-                { type: "wallBrick", bluePrint: "2.24.V3.OC" },
-                //{ type: "wallBrick", bluePrint: "0.0.V9.Co" },
+                { type: "wallBrick", bluePrint: "1.1.V11.CCOC" },
+                { type: "wallBrick", bluePrint: "1.3.H3.OCOC" },
+                { type: "wallBrick", bluePrint: "20.20.H1.O" },
             ],
         }
     ]
