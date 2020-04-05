@@ -49,17 +49,31 @@ const arena = {
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
     charDirection: "",                                 // (str)  -> (up|down|left|right)
+    time: 0,                                           // (+int) -> time that being incremented and triggers char and entitys move
     entityColors: {                                    //     predifined list of the displayable colors -
-        "charHead": "transparent",        //     defined here in order to save computations -
-        "charBody": "transparent",                    //     in 2d arr loop of displaying the table (can be > 1000s)
+        "charHead": "transparent",                     //     defined here in order to save computations -
+        "charBody": "transparent",                     //     in 2d arr loop of displaying the table (can be > 1000s)
         "crosshair": "rgba(255, 255, 255, 0.03)",
-        "wallBrick": "rgba(255, 255, 255, 0.2)",
+        "wallBrick": "transparent",
     },
-    brickColorSequence: [                              // (arr)  -> colors of random individual brick colors
-        "#b3a432", "#9c8128", "#ab752b", "#d9a662",
-        "#d99062", "#d97862", "#e35839", "#e33f39",
-        "#c7221c", "#ed140c"
-    ]
+    brickColorSequence: {
+        brick: [                                       // (obj of arr of str)  -> colors of random individual brick colors
+            "#b3a432", "#9c8128", "#ab752b", "#d9a662", "#d99062",
+            "#d97862", "#e35839", "#e33f39", "#c7221c", "#ed140c"
+        ],
+        light: [
+            "#ffffffaa", "#ffffffa5", "#ffffffbb", "#ffffffb5", "#ffffffcc",
+            "#ffffffc5", "#ffffff80", "#ffffff8a", "#ffffff99", "#ffffffdd",
+        ],
+        dark: [
+            "#ffffff00", "#ffffff10", "#ffffff20", "#ffffff30", "#ffffff2b",
+            "#ffffff15", "#ffffff3a", "#ffffff28", "#ffffff38", "#ffffff18",
+        ],
+        blue: [
+            "#c7e2e6", "#9db2b4", "#ade0de", "#a7e1e7", "#86d6d6",
+            "#a3baca", "#c9f3f8", "#b0cce6", "#7f8f91", "#97c9c9",
+        ]
+    }
 }
 
 // PERFORMANCE OPTIMISATION
@@ -100,7 +114,7 @@ function handleResize() {
 function handleKeypress(e) {
     if (app.interactionAllowed) {
         switch (e.keyCode) {
-            case 38: { moveCharacter(-1, 0); break; }
+            case 38: { charDirection = "up"; moveCharacter(-1, 0); break; }
             case 40: { moveCharacter(1, 0); break; }
             case 37: { moveCharacter(0, -1); break; }
             case 39: { moveCharacter(0, 1); break; }
@@ -209,7 +223,7 @@ function buildGameArenaEntitiesObject(obj) {
                     // check if no entity is on row, col
                     if (entities[id]) throw new Error(`Wall Error: Tried to place wall ${o.bluePrint} on occupied area! ${JSON.stringify(entities[id])}`);
 
-                    // set longer walls closures
+                    // modify longer walls closures to not to close within the wall bricks
                     if (idsArr.length > 1) {
                         if (model.direction === "horizontal") {
                             if (i === 0) modifiedModel.closure = [model.closure[0], 0, model.closure[2], model.closure[3]];
@@ -222,7 +236,7 @@ function buildGameArenaEntitiesObject(obj) {
                             else modifiedModel.closure = [0, model.closure[1], 0, model.closure[3]];
                         }
                     }
-                    entities[id] = { type: o.type, model: modifiedModel || model, colorSequence: createSequence() };
+                    entities[id] = { type: o.type, model: modifiedModel || model, colorSequence: createSequence(), colorMode: o.colorMode || "brick" };
                 });
             }
         } // end of switch game entity object type
@@ -600,7 +614,13 @@ function svgDraw(shape, attrs) {
 
 
 
-const getBrickColor = (n, e) => arena.brickColorSequence[e.colorSequence[n % arena.brickColorSequence.length]] + "70"; // last + str is hex for some transparency
+const getBrickColor = (n, e) => {
+    if (e.ColorMode === "transparent") return "transparent";
+    const colorSet = arena.brickColorSequence[e.colorMode];
+    const colorInd = e.colorSequence[n % colorSet.length];
+    const transparency = (e.colorMode === "brick" || e.colorMode === "blue") ? "70" : "";
+    return colorSet[colorInd] + transparency;
+}
 
 
 
@@ -666,3 +686,14 @@ function drawSingleWallBlock(div, entity) {
 
 
 
+/*##################################################################################################
+  #####################################  GAMEPLAY FUNCTIONS  #######################################
+  ##################################################################################################*/
+
+
+
+const gameTimer = setInterval(() => {
+    console.log(arena.time);
+    arena.time += 200;
+    if (arena.time === 1000) arena.time = 0;
+}, 200);
