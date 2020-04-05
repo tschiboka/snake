@@ -49,6 +49,7 @@ const arena = {
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
     charDirection: "",                                 // (str)  -> (up|down|left|right)
+    charSpeed: 2,                                      // (+int) -> the time the char needs to step one (ms)
     time: 0,                                           // (+int) -> time that being incremented and triggers char and entitys move
     entityColors: {                                    //     predifined list of the displayable colors -
         "charHead": "transparent",                     //     defined here in order to save computations -
@@ -114,13 +115,33 @@ function handleResize() {
 function handleKeypress(e) {
     if (app.interactionAllowed) {
         switch (e.keyCode) {
-            case 38: { charDirection = "up"; moveCharacter(-1, 0); break; }
-            case 40: { moveCharacter(1, 0); break; }
-            case 37: { moveCharacter(0, -1); break; }
-            case 39: { moveCharacter(0, 1); break; }
+            case 38: {
+                if (arena.charDirection === "up" && arena.charSpeed < 5) arena.charSpeed++;
+                else if (arena.charDirection === "down" && arena.charSpeed > 1) arena.charSpeed--;
+                else if (arena.charDirection !== "down") arena.charDirection = "up";
+                break;
+            }
+            case 40: {
+                if (arena.charDirection === "down" && arena.charSpeed < 5) arena.charSpeed++;
+                else if (arena.charDirection === "up" && arena.charSpeed > 1) arena.charSpeed--;
+                else if (arena.charDirection !== "up") arena.charDirection = "down";
+                break;
+            }
+            case 37: {
+                if (arena.charDirection === "left" && arena.charSpeed < 5) arena.charSpeed++;
+                else if (arena.charDirection === "right" && arena.charSpeed > 1) arena.charSpeed--;
+                else if (arena.charDirection !== "right") arena.charDirection = "left";
+                break;
+            }
+            case 39: {
+                if (arena.charDirection === "right" && arena.charSpeed < 5) arena.charSpeed++;
+                else if (arena.charDirection === "left" && arena.charSpeed > 1) arena.charSpeed--;
+                else if (arena.charDirection !== "left") arena.charDirection = "right";
+                break;
+            }
             case 32: { console.log("SPACE"); }
         }
-
+        console.log(arena.charSpeed, arena.charDirection)
     }
 }
 
@@ -693,7 +714,26 @@ function drawSingleWallBlock(div, entity) {
 
 
 const gameTimer = setInterval(() => {
-    console.log(arena.time);
-    arena.time += 200;
-    if (arena.time === 1000) arena.time = 0;
-}, 200);
+    // Circle of actions on board
+    // Character
+    let ms = 0;
+    switch (arena.charSpeed) {
+        case 1: { ms = 120; break; }
+        case 2: { ms = 80; break; }
+        case 3: { ms = 50; break; }
+        case 4: { ms = 30; break; }
+        case 5: { ms = 20; break; }
+    }
+
+    if (arena.time % ms === 0) {
+        switch (arena.charDirection) {
+            case "up": { moveCharacter(-1, 0); break; }
+            case "down": { moveCharacter(1, 0); break; }
+            case "left": { moveCharacter(0, -1); break; }
+            case "right": { moveCharacter(0, 1); break; }
+        }
+    }
+
+    arena.time += 10;
+    if (arena.time === 10000) arena.time = 0;
+}, 10);
