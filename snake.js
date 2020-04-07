@@ -34,6 +34,7 @@ const app = {
     gameTableCellLength: 21,                           // (+int) -> the width and length of a single arena table cell in px
     interactionAllowed: false,                         // (flag) -> if player can interact with the game
     gameTableIsDrawn: false,                           // (flag) -> risize doesn't affect gametable until its not drawn or level is done
+    performanceAvg: [],
 };
 
 /* ARENA has a collection of properties that refers to any var that directly affecting
@@ -44,7 +45,6 @@ const app = {
 const arena = {
     tableRowNum: undefined,                            // (+int) -> the displayable area expressed in table rows (coord)
     tableColNum: undefined,                            // (+int) -> the displayable area expressed in table columns (coord)
-    prevTableMap: undefined,                           // (arr of str)  -> if previous table coord has entity on it ("010110") (avoiding unneccesary repainting)
     gameEntities: undefined,                           // (arr of objs) -> list of objects that appears on the game map
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
@@ -379,11 +379,12 @@ function buildGameTableArea() {
     app.$entityBox = entityBox;
     app.$gameBox.appendChild(entityBox);
 
-
-    // create previous "busy" table map (first render all cells a bg)
-    arena.prevTableMap = Array(maxDisplayableRows).fill(new Array(maxDisplayableCols + 1).join("1"));
+    drawAllEntitiesOnGameBox(app.level.objects);
+    drawCharacterOnGameBox(app.level.gameCharacterCoords);
 
     arena.charDirection = arena.charDirection || app.level.gameCharacterDirection;
+    app.gameTableIsDrawn = true;
+    app.interactionAllowed = true;
 
     placeTableAtMap();
 }
@@ -400,6 +401,9 @@ const findEntitiesRowColIfType = (type) => {
 
 // position the table on the board centering around the characters head where it's possible
 function placeTableAtMap() {
+    const t0 = performance.now();
+    //app.$displayTable.style.display = "none";
+
     const tableCenRow = Math.floor((arena.tableRowNum - 1) / 2);
     const tableCenCol = Math.floor((arena.tableColNum - 1) / 2);
     const gameCharacterHeadCoords = findEntitiesRowColIfType("charHead");
@@ -420,195 +424,62 @@ function placeTableAtMap() {
     if (displayRowsFrom + arena.tableRowNum - app.level.dimension.rows > 0) displayRowsFrom = app.level.dimension.rows - arena.tableRowNum;
     if (displayColsFrom + arena.tableColNum - app.level.dimension.cols > 0) displayColsFrom = app.level.dimension.cols - arena.tableColNum;
 
-
     // animate background (parallax)
     const paralCoef = arena.parallaxCoefficient;
     app.$displayTable.style.backgroundPosition = `${displayColsFrom * paralCoef * -1}px ${displayRowsFrom * paralCoef * -1}px`;
 
-    // clear entity divs
-    app.$entityBox.innerHTML = "";
-
-    for (let r = 0; r < arena.tableRowNum; r++) {
-        for (let c = 0; c < arena.tableColNum; c++) {
+    // loop through an extra grid of rows and cols around table for clearing objects that will go out of tables range
+    for (let r = -1; r <= arena.tableRowNum; r++) {
+        for (let c = -1; c <= arena.tableColNum; c++) {
             [rowOnMap, colOnMap] = [displayRowsFrom + r, displayColsFrom + c];
-            clearDisplayTable(r, c);
-            displayEntitiesOnTable(r, c, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol);
+            // if entity exist and there is element assigned to that id: clear it!
+            if (arena.gameEntities[`r${rowOnMap}c${colOnMap}`] && app[`$entity_r${rowOnMap}c${colOnMap}`]) {
+                app[`$entity_r${rowOnMap}c${colOnMap}`].style.display = "none";
+            }
+            // only paint entities within range
+            if (r >= 0 && c >= 0 && r < arena.tableRowNum && c < arena.tableColNum) {
+                // if entity exist and there is element assigned to that id: paint
+                if (arena.gameEntities[`r${rowOnMap}c${colOnMap}`] && app[`$entity_r${rowOnMap}c${colOnMap}`]) {
+                    app[`$entity_r${rowOnMap}c${colOnMap}`].setAttribute("style", `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`);
+                }
+            }
         }
     }
-    app.gameTableIsDrawn = true;
-    app.interactionAllowed = true;
+
+    //app.$displayTable.style.display = "block";
+
+    t1 = performance.now();
+    app.performanceAvg.push(t1 - t0)
+    if (app.performanceAvg.length % 10 === 0) console.log("PERFORMANCE", (app.performanceAvg.reduce((a, b) => a + b) / app.performanceAvg.length).toFixed(2) + "ms");
 }
 
 
 
-// table repainting is optimised, so only the cells that were painted in the prev display are getting reset
-function clearDisplayTable(row, col) {
-    if (arena.prevTableMap[row][col] === "1") {
-        arena[`$r${row}c${col}`].style.background = "transparent";
-        arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "0"); // clear prevTableMap
-    }
-}
-
-
-
-// DOM call is only for elements that are being painted, color is declared globally to cut computation cost when rendering large tables 
-function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol) {
-    // set background colors
-    let color = "", elem;
-    const entity = arena.gameEntities[`r${rowOnMap}c${colOnMap}`];
-
-    if (row === tableCenRow && col === tableCenCol) color = arena.entityColors.crosshair;
-    if (entity) color = arena.entityColors[entity.type];
-    if (rowOnMap === characterAtRow && colOnMap === characterAtCol) color = arena.entityColors.charHead;
-
-    if (color) {
-        elem = arena[`$r${row}c${col}`];
-        elem.style.background = color;
-        arena.prevTableMap[row] = arena.prevTableMap[row].replaceAt(col, "1"); // set prevTableMap
-    }
-
-    if (entity) {
-        // find entity divs x, y position
-        const [x, y] = [elem.offsetLeft, elem.offsetTop];
-        const entityDiv = document.createElement("div");
-        entityDiv.classList.add(`entity--${entity.type}`, "entity");
-        entityDiv.style.top = y + "px";
-        entityDiv.style.left = x + "px";
-        entityDiv.style.width = app.gameTableCellLength + "px";
-        entityDiv.style.height = app.gameTableCellLength + "px";
-
-        switch (entity.type) {
-            case "charBody": {
-                const charLength = app.level.gameCharacterCoords.length;
-                function transformBody(width, index) {
-                    // last body parts are closer to the previous one
-                    let addDistRowCol = [0, 0];
-                    let coef = index === charLength - 1 ? 6 : entity.index === charLength - 2 ? 3 : 0;
-                    if (index) {
-                        addDistRowCol = findEntitiesRowColIfType("charBody")                            // get entities type char body
-                            .map(rc => `r${rc[0]}c${rc[1]}`)                                            // get their ids
-                            .filter(id => arena.gameEntities[id].index === index - 1)[0]                // find previous index id
-                            .match(/\d+/g)                                                              // extract row col
-                            .map((rc, i) => i === 0 ? (rc - rowOnMap) * coef : (rc - colOnMap) * coef); // get difference in col row
-                    }
-
-                    entityDiv.style.width = app.gameTableCellLength - width + "px";
-                    entityDiv.style.height = app.gameTableCellLength - width + "px";
-                    entityDiv.style.transform = `translate(${(width / 2) + addDistRowCol[1]}px, ${(width / 2) + addDistRowCol[0]}px)`;
-                    entityDiv.style.WebkitTransform = `translate(${(width / 2) + addDistRowCol[1]}px, ${(width / 2) + addDistRowCol[0]}px)`;
-                }
-
-                if (entity.index === charLength - 1) { transformBody(8, entity.index); }
-                else if (entity.index === charLength - 2) { transformBody(6, entity.index); }
-                else if (entity.index === charLength - 3) { transformBody(4); }
-                else { transformBody(2); }
-                if (entity.index === 1) {
-                    switch (arena.charDirection) {
-                        case "left": { entityDiv.style.borderRadius = "0px 2px 2px 0px"; break; }
-                        case "right": { entityDiv.style.borderRadius = "2px 0px 0px 2px"; break; }
-                        case "up": { entityDiv.style.borderRadius = "0px 0px 2px 2px"; break; }
-                        case "down": { entityDiv.style.borderRadius = "2px 2px 0px 0px"; }
-                    }
-                }
-
-                entityDiv.style.backgroundColor = `rgba(200, 180, 255, ${0.6 - (entity.index / 20)})`;
-                break;
-            }
-            case "charHead": {
-                entityDiv.style.width = app.gameTableCellLength - 2 + "px";
-                entityDiv.style.height = app.gameTableCellLength - 2 + "px";
-                entityDiv.style.backgroundColor = "black";
-
-                if (arena.charDirection === "left" || arena.charDirection === "right") {
-                    entityDiv.style.transform = "translate(0px, 1px)";
-                    entityDiv.style.WebkitTransform = "translate(0px, 1px)";
-                }
-                if (arena.charDirection === "up" || arena.charDirection === "down") {
-                    entityDiv.style.transform = "translate(1px, 0px)";
-                    entityDiv.style.WebkitTransform = "translate(1px, 0px)";
-                }
-
-                switch (arena.charDirection) {
-                    case "left": { entityDiv.style.borderRadius = "7px 0px 0px 7px"; break; }
-                    case "right": { entityDiv.style.borderRadius = "0px 7px 7px 0px"; break; }
-                    case "up": { entityDiv.style.borderRadius = "7px 7px 0px 0px"; break; }
-                    case "down": { entityDiv.style.borderRadius = "0px 0px 7px 7px"; }
-                }
-
-                // eyes
-                function createEyes() {
-                    const eyeCavity = document.createElement("div");
-                    eyeCavity.classList.add("entity--charEyeCavity");
-                    const eye = document.createElement("div");
-                    eye.classList.add("entity--charEye");
-                    eyeCavity.appendChild(eye);
-                    return eyeCavity;
-                }
-                createEyes();
-
-                const eye1 = createEyes();
-                const eye2 = createEyes();
-
-                // eyes are placed differently according to the move direction being horizontal or vertical
-                if (arena.charDirection === "up" || arena.charDirection === "down") {
-                    eye1.style.width = "50%"; eye1.style.height = "100%";
-                    eye2.style.width = "50%"; eye2.style.height = "100%";
-                }
-                if (arena.charDirection === "left" || arena.charDirection === "right") {
-                    eye1.style.width = "100%"; eye1.style.height = "50%";
-                    eye2.style.width = "100%"; eye2.style.height = "50%";
-                    entityDiv.style.flexDirection = "column";
-                }
-
-                entityDiv.appendChild(eye1);
-                entityDiv.appendChild(eye2);
-                break;
-            }
-            case "wallBrick": {
-                drawSingleWallBlock(entityDiv, entity);
-                break;
-            }
-        } // end of switch entity type
-
-        app.$entityBox.appendChild(entityDiv);
-    }
-}
-
-
-
-function moveCharacter(row, col) {
-    // check if next move is in maps range or collides into other entity
-    let outOfRange = collides = false;
-    const characterCoords = [...findEntitiesRowColIfType("charHead").concat(findEntitiesRowColIfType("charBody"))]; // loose reference
-    if (characterCoords[0][0] + row < 0 || characterCoords[0][1] + col < 0) outOfRange = true;
-    if (characterCoords[0][0] + row > app.level.dimension.rows - 1 || characterCoords[0][1] + col > app.level.dimension.cols - 1) outOfRange = true;
-    if (arena.gameEntities[`r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`]) collides = true;
-    if (outOfRange || collides) return void (0);
-
-    // copy objs & delete character from entities obj
-    const characterObjCopys = []
-    characterCoords.forEach(coords => {
-        characterObjCopys.push(arena.gameEntities[`r${coords[0]}c${coords[1]}`]);
-        delete arena.gameEntities[`r${coords[0]}c${coords[1]}`];
+function drawAllEntitiesOnGameBox() {
+    Object.keys(arena.gameEntities).forEach(coord => {
+        switch (arena.gameEntities[coord].type) {
+            case "wallBrick": { drawSingleWallBlock(arena.gameEntities[coord], coord); break; }
+        }
     });
-    characterObjCopys.sort((a, b) => a.index - b.index);
+}
 
-    // calculate new positions
-    arena.gameEntities[`r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`] = characterObjCopys[0];
-    characterCoords.pop();
-    if (characterObjCopys.length > 1) {
-        characterCoords.forEach((coords, i) => { arena.gameEntities[`r${coords[0]}c${coords[1]}`] = characterObjCopys[i + 1]; });
+
+
+function clearDisplayTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol, tableMaxRow, tableMaxCol) {
+    if (arena.gameEntities[`r${rowOnMap}c${colOnMap}`] && app[`$entity_r${rowOnMap}c${colOnMap}`]) {
+        //console.log("CLEAR " + rowOnMap + " " + colOnMap);
+        app[`$entity_r${rowOnMap}c${colOnMap}`].style.display = "none";
     }
+}
 
-    // direction must be determined if movement doesn't end with collision
-    switch ("" + row + col) {
-        case "-10": { arena.charDirection = "up"; break; }
-        case "10": { arena.charDirection = "down"; break; }
-        case "0-1": { arena.charDirection = "left"; break; }
-        case "01": { arena.charDirection = "right"; }
+
+
+function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol) {
+    // entity exist and there is element assigned to that id
+    if (arena.gameEntities[`r${rowOnMap}c${colOnMap}`] && app[`$entity_r${rowOnMap}c${colOnMap}`]) {
+        //console.log("PAINT", rowOnMap, colOnMap);
+        app[`$entity_r${rowOnMap}c${colOnMap}`].setAttribute("style", `top: ${row * app.gameTableCellLength}px; left: ${col * app.gameTableCellLength}px; display: block;`);
     }
-
-    placeTableAtMap();
 }
 
 
@@ -645,7 +516,26 @@ const getBrickColor = (n, e) => {
 
 
 
-function drawSingleWallBlock(div, entity) {
+function drawCharacterOnGameBox(coords) {
+    const l = app.gameTableCellLength + 1;
+
+    coords.forEach((ch, i) => {
+        if (i === 0) {
+            const svg = createSvg({ width: l, height: l });
+            headRect = svgDraw("rect", { x: 0, y: 0, width: l / 2, height: l / 3, fill: "white" });
+            svg.id = `entity_char${i}`;
+            svg.setAttribute("style", `display: none;`);
+            app.$entityBox.appendChild(svg.appendChild(headRect));
+            app[`$entity_r${coords[0]}c${coords[1]}`] = svg;
+            console.log(svg);
+        }
+    });
+}
+
+
+
+function drawSingleWallBlock(entity, coords) {
+    const [row, col] = coords.match(/\d+/g);
     const model = entity.model;
     const l = app.gameTableCellLength + 1;
     const svg = createSvg({ width: l, height: l });
@@ -702,7 +592,11 @@ function drawSingleWallBlock(div, entity) {
         line4 = svgDraw("line", { x1: 1, x2: 1, y1: 0, y2: l - 1, stroke: c1, "stroke-width": 2 });
         svg.appendChild(line4);
     }
-    div.appendChild(svg);
+
+    svg.id = `entity_r${row}c${col}`;
+    svg.setAttribute("style", `display: none;`);
+    app[`$entity_r${row}c${col}`] = svg;
+    app.$entityBox.appendChild(svg);
 }
 
 
@@ -737,3 +631,42 @@ const gameTimer = setInterval(() => {
     arena.time += 10;
     if (arena.time === 10000) arena.time = 0;
 }, 10);
+
+
+
+function moveCharacter(row, col) {
+    // check if next move is in maps range or collides into other entity
+    let outOfRange = collides = false;
+    const characterCoords = [...findEntitiesRowColIfType("charHead").concat(findEntitiesRowColIfType("charBody"))]; // loose reference
+    if (characterCoords[0][0] + row < 0 || characterCoords[0][1] + col < 0) outOfRange = true;
+    if (characterCoords[0][0] + row > app.level.dimension.rows - 1 || characterCoords[0][1] + col > app.level.dimension.cols - 1) outOfRange = true;
+    if (arena.gameEntities[`r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`]) collides = true;
+    if (outOfRange || collides) return void (0);
+
+    // copy objs & delete character from entities obj
+    const characterObjCopys = []
+    characterCoords.forEach(coords => {
+        characterObjCopys.push(arena.gameEntities[`r${coords[0]}c${coords[1]}`]);
+        delete arena.gameEntities[`r${coords[0]}c${coords[1]}`];
+    });
+    characterObjCopys.sort((a, b) => a.index - b.index);
+
+    // calculate new positions
+    arena.gameEntities[`r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`] = characterObjCopys[0];
+    characterCoords.pop();
+    if (characterObjCopys.length > 1) {
+        characterCoords.forEach((coords, i) => { arena.gameEntities[`r${coords[0]}c${coords[1]}`] = characterObjCopys[i + 1]; });
+    }
+
+    // direction must be determined if movement doesn't end with collision
+    switch ("" + row + col) {
+        case "-10": { arena.charDirection = "up"; break; }
+        case "10": { arena.charDirection = "down"; break; }
+        case "0-1": { arena.charDirection = "left"; break; }
+        case "01": { arena.charDirection = "right"; }
+    }
+
+    placeTableAtMap();
+}
+
+

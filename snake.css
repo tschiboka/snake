@@ -105,6 +105,16 @@ body {
     color: rgba(248, 135, 69, 0.336)
 }
 
+#entity-box {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+}
+
+#entity-box svg {
+    position: absolute;
+}
+
 .entity {
     position: absolute;
 }
