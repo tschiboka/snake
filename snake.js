@@ -210,7 +210,6 @@ function buildGameArenaEntitiesObject(obj) {
     const entities = Array(app.level.dimension.rows).fill().map(() => Array(app.level.dimension.cols).fill(undefined));
 
 
-
     // check if game character has all properties set properly and build them into game entities
     if (!app.level.gameCharacterCoords) throw new Error("Levels gameCharacterCoords property has not been defined! " + JSON.stringify(app.level));
     if (!Array.isArray(app.level.gameCharacterCoords)) throw new Error("Levels gameCharacterCoords property most be an array " + app.level.gameCharacterCoords);
@@ -219,9 +218,11 @@ function buildGameArenaEntitiesObject(obj) {
         if (!Array.isArray(coord)) throw new Error("Levels gameCharacter properties items must be all arrays! " + coord);
         if (coord.length !== 2) throw new Error("Game characters coordinates must have 2 items!", + coord);
         if (isNaN(parseInt(coord[0])) || isNaN(parseInt(coord[1]))) throw new Error("Game characters coordinate must be a number! " + coord);
+
         // coordinates must be in the range of the map
         if (coord[0] < 0 || coord[1] < 0) throw new Error("Game character is out of game maps range! ", coord);
         if (coord[0] > app.level.dimension.rows - 1 || coord[1] > app.level.dimension.cols - 1) throw new Error("Game character is out of game maps range! ", coord);
+
         // choordinates must connect to the previous element
         if (i !== 0) { // first ind [0] has no previous connenction
             const connectR = connectC = false;
@@ -231,12 +232,12 @@ function buildGameArenaEntitiesObject(obj) {
             if (Math.abs(coord[1] - prevC) === 1 && coord[0] === prevR) connectC = true;
             if (!connectR && !connectC) throw new Error("Character coordinates must have a connection either on a row or a column! " + coord + " " + coordArr[i - 1]);
         }
+
         entities[coord[0]][coord[1]] = {
             type: (i === 0 ? "charHead" : "charBody"),
             index: i
         }
     });
-
 
 
     // Game objs can have different set of random colors.
@@ -246,6 +247,7 @@ function buildGameArenaEntitiesObject(obj) {
         switch (o.type) {
             case "wallBrick": {
                 const [model, coords] = extractWallsShorthand(o);
+
                 coords.map((coord, i, idsArr) => {
                     modifiedModel = { ...model };
                     // check if no entity is on row, col
@@ -258,19 +260,21 @@ function buildGameArenaEntitiesObject(obj) {
                             else if (i === idsArr.length - 1) modifiedModel.closure = [model.closure[0], model.closure[1], model.closure[2], 0];
                             else modifiedModel.closure = modifiedModel.closure = [model.closure[0], 0, model.closure[2], 0];
                         }
+
                         if (model.direction === "vertical") {
                             if (i === 0) modifiedModel.closure = [model.closure[0], model.closure[1], 0, model.closure[3]];
                             else if (i === idsArr.length - 1) modifiedModel.closure = [0, model.closure[1], model.closure[2], model.closure[3]];
                             else modifiedModel.closure = [0, model.closure[1], 0, model.closure[3]];
                         }
                     }
+
                     entities[coord[0]][coord[1]] = {
                         type: o.type,
                         model: modifiedModel || model,
                         colorSequence: createSequence(),
                         colorMode: o.colorMode || "brick"
                     };
-                });
+                }); // end of msp coord
             } // end of case wallBrick
         } // end of switch game entity object type
     });
@@ -301,6 +305,7 @@ function extractWallsShorthand(wallObj) {
 
     descriptors[0] = descriptors[0].match(/^(V|H)|\d+$/g);
     const [direction, length] = [descriptors[0][0] === "H" ? "horizontal" : "vertical", Number(descriptors[0][1])];
+
     if (length < 1) throw new Error("Wall Error: length must be greater than 0!\t" + length);
     if (direction === "horizontal" && col + length > app.level.dimension.cols) throw new Error("Wall Error: Wall length is extending wall columns range!\t" + wallObj.bluePrint);
     if (direction === "vertical" && row + length > app.level.dimension.rows) throw new Error("Wall Error: Wall length is extending wall rows range!\t" + wallObj.bluePrint);
@@ -317,8 +322,10 @@ function extractWallsShorthand(wallObj) {
 
     // case no joint -> full closure
     if (descriptors.length === 1 || descriptors[1] === "C") closure = [1, 1, 1, 1];                         // H1 | H1C
+
     // case fully open 
     else if (descriptors[1] === "O") closure = [0, 0, 0, 0];                                                // V1.O
+
     // case custom closing lines 
     else if (/^(O|C){4}$/g.test(descriptors[1])) closure = [...descriptors[1]].map(d => d === "C" ? 1 : 0); // V1.OCCO
     else throw new Error("Wall Error: Badly constructed blue-print!\t" + wallObj.bluePrint);
@@ -664,6 +671,8 @@ function moveCharacter(row, col) {
     characterCoords.forEach(coords => arena.gameEntities[coords[0]][coords[1]] = undefined);
     characterCoords.unshift([headCoord[0] + row, headCoord[1] + col]);
     characterCoords.pop();
+    app.level.gameCharacterCoords = characterCoords;
+
 
     // assign new items to corrisponding arr slots
     characterCoords.forEach((coords, i) => arena.gameEntities[coords[0]][coords[1]] = charObjs[i]);

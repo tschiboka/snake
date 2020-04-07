@@ -54,14 +54,6 @@ body {
     border: 1px solid #ddd;
 }
 
-.game__box {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    order: 2;
-    cursor: none;
-}
-
 .game > div {
     width: 100%;
 }
@@ -69,6 +61,15 @@ body {
 .game__stats {
     order: 1;
     border-bottom: 1px solid #ddd;
+}
+
+.game__box {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border: 1px solid #ddd;
+    order: 2;
+    cursor: none;
 }
 
 .game__box > table {
@@ -113,38 +114,6 @@ body {
 
 #entity-box svg {
     position: absolute;
-}
-
-.entity {
-    position: absolute;
-}
-
-.entity--wallBrick {
-    color: #c7e2e6, #9db2b4,#ade0de,#a7e1e7,#86d6d6,#a3baca,#c9f3f8,#b0cce6,#7f8f91,#97c9c9, #7aaca5, #a8d6f5
-}
-
-.entity--charHead, .entity--charBody {
-    display: flex;
-    border: 2px rgb(194, 221, 229) solid;
-}
-
-.entity--charBody {
-    border-radius: 3px;
-}
-
-.entity--charEyeCavity {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.entity--charEye {
-    width: 4px;
-    height: 4px;
-    border-radius: 2px;
-    background: rgb(194, 211, 229);
 }
 
 @keyframes intro {
