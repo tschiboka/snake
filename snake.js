@@ -45,11 +45,11 @@ const app = {
 const arena = {
     tableRowNum: undefined,                            // (+int) -> the displayable area expressed in table rows (coord)
     tableColNum: undefined,                            // (+int) -> the displayable area expressed in table columns (coord)
-    gameEntities: undefined,                           // (arr of objs) -> list of objects that appears on the game map
+    gameEntities: undefined,                           // (arr of arr objs) -> row col of objects that appears on the game map
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
     charDirection: "",                                 // (str)  -> (up|down|left|right)
-    charSpeed: 2,                                      // (+int) -> the time the char needs to step one (ms)
+    charSpeed: 0,                                      // (+int) -> the time the char needs to step one (ms)
     time: 0,                                           // (+int) -> time that being incremented and triggers char and entitys move
     entityColors: {                                    //     predifined list of the displayable colors -
         "charHead": "transparent",                     //     defined here in order to save computations -
@@ -207,13 +207,14 @@ function startLevel() {
 
 function buildGameArenaEntitiesObject(obj) {
     // create an emtpty 2D array
-    let entities = {};
+    const entities = Array(app.level.dimension.rows).fill().map(() => Array(app.level.dimension.cols).fill(undefined));
+    console.log(entities);
 
     // check if game character has all properties set properly and build them into game entities
     if (!app.level.gameCharacterCoords) throw new Error("Levels gameCharacterCoords property has not been defined! " + JSON.stringify(app.level));
     if (!Array.isArray(app.level.gameCharacterCoords)) throw new Error("Levels gameCharacterCoords property most be an array " + app.level.gameCharacterCoords);
     if (app.level.gameCharacterCoords.length < 4) throw new Error("Levels gameCharacterCoords property must have at least 4 items! Only found " + app.level.gameCharacterCoords.length + ".");
-    app.level.gameCharacterCoords.map((coord, i, coordArr) => {
+    app.level.gameCharacterCoords.forEach((coord, i, coordArr) => {
         if (!Array.isArray(coord)) throw new Error("Levels gameCharacter properties items must be all arrays! " + coord);
         if (coord.length !== 2) throw new Error("Game characters coordinates must have 2 items!", + coord);
         if (isNaN(parseInt(coord[0])) || isNaN(parseInt(coord[1]))) throw new Error("Game characters coordinate must be a number! " + coord);
@@ -229,7 +230,7 @@ function buildGameArenaEntitiesObject(obj) {
             if (Math.abs(coord[1] - prevC) === 1 && coord[0] === prevR) connectC = true;
             if (!connectR && !connectC) throw new Error("Character coordinates must have a connection either on a row or a column! " + coord + " " + coordArr[i - 1]);
         }
-        return entities[`r${coord[0]}c${coord[1]}`] = { type: (i === 0 ? "charHead" : "charBody"), index: i }
+        entities[coord[0]][coord[1]] = { type: (i === 0 ? "charHead" : "charBody"), index: i }
     });
 
     // Game objs can have different set of random colors.
@@ -238,11 +239,11 @@ function buildGameArenaEntitiesObject(obj) {
     obj.forEach(o => {
         switch (o.type) {
             case "wallBrick": {
-                const [model, ids] = extractWallsShorthand(o);
-                ids.map((id, i, idsArr) => {
+                const [model, coords] = extractWallsShorthand(o);
+                coords.map((coord, i, idsArr) => {
                     modifiedModel = { ...model };
                     // check if no entity is on row, col
-                    if (entities[id]) throw new Error(`Wall Error: Tried to place wall ${o.bluePrint} on occupied area! ${JSON.stringify(entities[id])}`);
+                    if (entities[coord[0]][coord[1]]) throw new Error(`Wall Error: Tried to place wall ${o.bluePrint} on occupied area! ${JSON.stringify(entities[coord[0]][coord[1]])}`);
 
                     // modify longer walls closures to not to close within the wall bricks
                     if (idsArr.length > 1) {
@@ -257,12 +258,11 @@ function buildGameArenaEntitiesObject(obj) {
                             else modifiedModel.closure = [0, model.closure[1], 0, model.closure[3]];
                         }
                     }
-                    entities[id] = { type: o.type, model: modifiedModel || model, colorSequence: createSequence(), colorMode: o.colorMode || "brick" };
+                    entities[coord[0]][coord[1]] = { type: o.type, model: modifiedModel || model, colorSequence: createSequence(), colorMode: o.colorMode || "brick" };
                 });
-            }
+            } // end of case wallBrick
         } // end of switch game entity object type
     });
-
     return entities;
 }
 
@@ -317,13 +317,11 @@ function extractWallsShorthand(wallObj) {
         throw new Error("Wall Error: created wall is out of map range!\t" + wallObj.bluePrint);
     }
 
-    const ids = coordinates.map(c => `r${c[0]}c${c[1]}`);
-
     return [{
         direction: direction,
         blueprint: wallObj.bluePrint,
         closure: closure,
-    }, ids];
+    }, coordinates];
 }
 
 
@@ -386,7 +384,7 @@ function buildGameTableArea() {
     app.gameTableIsDrawn = true;
     app.interactionAllowed = true;
 
-    placeTableAtMap();
+    //    placeTableAndCharsOnMap();
 }
 
 
@@ -400,7 +398,7 @@ const findEntitiesRowColIfType = (type) => {
 
 
 // position the table on the board centering around the characters head where it's possible
-function placeTableAtMap() {
+function placeTableAndCharsOnMap() {
     const t0 = performance.now();
     //app.$displayTable.style.display = "none";
 
@@ -432,13 +430,13 @@ function placeTableAtMap() {
     for (let r = -1; r <= arena.tableRowNum; r++) {
         for (let c = -1; c <= arena.tableColNum; c++) {
             [rowOnMap, colOnMap] = [displayRowsFrom + r, displayColsFrom + c];
-            // if entity exist and there is element assigned to that id: clear it!
+            // if entity exist and there is element assigned to that id: clear it
             if (arena.gameEntities[`r${rowOnMap}c${colOnMap}`] && app[`$entity_r${rowOnMap}c${colOnMap}`]) {
                 app[`$entity_r${rowOnMap}c${colOnMap}`].style.display = "none";
             }
             // only paint entities within range
             if (r >= 0 && c >= 0 && r < arena.tableRowNum && c < arena.tableColNum) {
-                // if entity exist and there is element assigned to that id: paint
+                // if entity exist and there is element assigned to that id: paint it
                 if (arena.gameEntities[`r${rowOnMap}c${colOnMap}`] && app[`$entity_r${rowOnMap}c${colOnMap}`]) {
                     app[`$entity_r${rowOnMap}c${colOnMap}`].setAttribute("style", `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`);
                 }
@@ -461,25 +459,6 @@ function drawAllEntitiesOnGameBox() {
             case "wallBrick": { drawSingleWallBlock(arena.gameEntities[coord], coord); break; }
         }
     });
-}
-
-
-
-function clearDisplayTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol, tableMaxRow, tableMaxCol) {
-    if (arena.gameEntities[`r${rowOnMap}c${colOnMap}`] && app[`$entity_r${rowOnMap}c${colOnMap}`]) {
-        //console.log("CLEAR " + rowOnMap + " " + colOnMap);
-        app[`$entity_r${rowOnMap}c${colOnMap}`].style.display = "none";
-    }
-}
-
-
-
-function displayEntitiesOnTable(row, col, rowOnMap, colOnMap, characterAtRow, characterAtCol, tableCenRow, tableCenCol) {
-    // entity exist and there is element assigned to that id
-    if (arena.gameEntities[`r${rowOnMap}c${colOnMap}`] && app[`$entity_r${rowOnMap}c${colOnMap}`]) {
-        //console.log("PAINT", rowOnMap, colOnMap);
-        app[`$entity_r${rowOnMap}c${colOnMap}`].setAttribute("style", `top: ${row * app.gameTableCellLength}px; left: ${col * app.gameTableCellLength}px; display: block;`);
-    }
 }
 
 
@@ -520,15 +499,13 @@ function drawCharacterOnGameBox(coords) {
     const l = app.gameTableCellLength + 1;
 
     coords.forEach((ch, i) => {
-        if (i === 0) {
-            const svg = createSvg({ width: l, height: l });
-            headRect = svgDraw("rect", { x: 0, y: 0, width: l / 2, height: l / 3, fill: "white" });
-            svg.id = `entity_char${i}`;
-            svg.setAttribute("style", `display: none;`);
-            app.$entityBox.appendChild(svg.appendChild(headRect));
-            app[`$entity_r${coords[0]}c${coords[1]}`] = svg;
-            console.log(svg);
-        }
+        const svg = createSvg({ width: l, height: l });
+        headRect = svgDraw("rect", { x: 0, y: 0, width: l, height: l, fill: "white" });
+        svg.setAttribute("style", `display: none;`);
+        svg.id = `entity_r${ch[0]}c${ch[1]}`;
+        svg.appendChild(headRect);
+        app[`$entity_r${ch[0]}c${ch[1]}`] = svg;
+        app.$entityBox.appendChild(svg);
     });
 }
 
@@ -653,6 +630,8 @@ function moveCharacter(row, col) {
 
     // calculate new positions
     arena.gameEntities[`r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`] = characterObjCopys[0];
+    console.log(app[`$entity_r${characterCoords[0][0]}c${characterCoords[0][1]}`])
+    // = app[`$entity_r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`]
     characterCoords.pop();
     if (characterObjCopys.length > 1) {
         characterCoords.forEach((coords, i) => { arena.gameEntities[`r${coords[0]}c${coords[1]}`] = characterObjCopys[i + 1]; });
@@ -666,7 +645,7 @@ function moveCharacter(row, col) {
         case "01": { arena.charDirection = "right"; }
     }
 
-    placeTableAtMap();
+    placeTableAndCharsOnMap();
 }
 
 

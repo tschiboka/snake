@@ -2,7 +2,7 @@ const levels =
     [
         // LEVEL 1
         {
-            dimension: { rows: 150, cols: 150 },
+            dimension: { rows: 50, cols: 50 },
             gameCharacterCoords: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6]],
             gameCharacterDirection: "down",
             objects: [
@@ -14,7 +14,7 @@ const levels =
                 { type: "wallBrick", bluePrint: "21.28.H4.CCCO", colorMode: "brick" },
                 { type: "wallBrick", bluePrint: "22.27.V6.OCCC", colorMode: "brick" },
                 { type: "wallBrick", bluePrint: "5.4.H25", colorMode: "blue" },
-                { type: "wallBrick", bluePrint: "149.149.H1.OOCC", colorMode: "brick" },
+                { type: "wallBrick", bluePrint: "49.49.H1.OOCC", colorMode: "brick" },
             ],
         }
     ]
