@@ -49,7 +49,7 @@ const arena = {
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
     charDirection: "",                                 // (str)  -> (up|down|left|right)
-    charSpeed: 0,                                      // (+int) -> the time the char needs to step one (ms)
+    charSpeed: 2,                                      // (+int) -> the time the char needs to step one (ms)
     time: 0,                                           // (+int) -> time that being incremented and triggers char and entitys move
     entityColors: {                                    //     predifined list of the displayable colors -
         "charHead": "transparent",                     //     defined here in order to save computations -
@@ -208,7 +208,8 @@ function startLevel() {
 function buildGameArenaEntitiesObject(obj) {
     // create an emtpty 2D array
     const entities = Array(app.level.dimension.rows).fill().map(() => Array(app.level.dimension.cols).fill(undefined));
-    console.log(entities);
+
+
 
     // check if game character has all properties set properly and build them into game entities
     if (!app.level.gameCharacterCoords) throw new Error("Levels gameCharacterCoords property has not been defined! " + JSON.stringify(app.level));
@@ -230,8 +231,13 @@ function buildGameArenaEntitiesObject(obj) {
             if (Math.abs(coord[1] - prevC) === 1 && coord[0] === prevR) connectC = true;
             if (!connectR && !connectC) throw new Error("Character coordinates must have a connection either on a row or a column! " + coord + " " + coordArr[i - 1]);
         }
-        entities[coord[0]][coord[1]] = { type: (i === 0 ? "charHead" : "charBody"), index: i }
+        entities[coord[0]][coord[1]] = {
+            type: (i === 0 ? "charHead" : "charBody"),
+            index: i
+        }
     });
+
+
 
     // Game objs can have different set of random colors.
     // Colors defined here, in level obj building func, thus they won't change with each redrawal of game table
@@ -258,7 +264,12 @@ function buildGameArenaEntitiesObject(obj) {
                             else modifiedModel.closure = [0, model.closure[1], 0, model.closure[3]];
                         }
                     }
-                    entities[coord[0]][coord[1]] = { type: o.type, model: modifiedModel || model, colorSequence: createSequence(), colorMode: o.colorMode || "brick" };
+                    entities[coord[0]][coord[1]] = {
+                        type: o.type,
+                        model: modifiedModel || model,
+                        colorSequence: createSequence(),
+                        colorMode: o.colorMode || "brick"
+                    };
                 });
             } // end of case wallBrick
         } // end of switch game entity object type
@@ -384,15 +395,20 @@ function buildGameTableArea() {
     app.gameTableIsDrawn = true;
     app.interactionAllowed = true;
 
-    //    placeTableAndCharsOnMap();
+    placeTableAndCharsOnMap();
 }
 
 
 
 // function returns an arr of arr [[row, col], ...]
-const findEntitiesRowColIfType = (type) => {
-    const keys = Object.keys(arena.gameEntities).filter(k => arena.gameEntities[k].type === type);
-    return keys.map(k => k.match(/\d+/g).map(Number));
+const findEntitiesRowColIfType = type => {
+    const entities = [];
+    for (let r = 0; r < arena.gameEntities.length; r++) {
+        for (let c = 0; c < arena.gameEntities[r].length; c++) {
+            if (arena.gameEntities[r][c] && arena.gameEntities[r][c].type === type) entities.push([r, c]);
+        }
+    }
+    return entities;
 }
 
 
@@ -400,7 +416,6 @@ const findEntitiesRowColIfType = (type) => {
 // position the table on the board centering around the characters head where it's possible
 function placeTableAndCharsOnMap() {
     const t0 = performance.now();
-    //app.$displayTable.style.display = "none";
 
     const tableCenRow = Math.floor((arena.tableRowNum - 1) / 2);
     const tableCenCol = Math.floor((arena.tableColNum - 1) / 2);
@@ -429,22 +444,23 @@ function placeTableAndCharsOnMap() {
     // loop through an extra grid of rows and cols around table for clearing objects that will go out of tables range
     for (let r = -1; r <= arena.tableRowNum; r++) {
         for (let c = -1; c <= arena.tableColNum; c++) {
-            [rowOnMap, colOnMap] = [displayRowsFrom + r, displayColsFrom + c];
-            // if entity exist and there is element assigned to that id: clear it
-            if (arena.gameEntities[`r${rowOnMap}c${colOnMap}`] && app[`$entity_r${rowOnMap}c${colOnMap}`]) {
-                app[`$entity_r${rowOnMap}c${colOnMap}`].style.display = "none";
-            }
-            // only paint entities within range
-            if (r >= 0 && c >= 0 && r < arena.tableRowNum && c < arena.tableColNum) {
-                // if entity exist and there is element assigned to that id: paint it
-                if (arena.gameEntities[`r${rowOnMap}c${colOnMap}`] && app[`$entity_r${rowOnMap}c${colOnMap}`]) {
-                    app[`$entity_r${rowOnMap}c${colOnMap}`].setAttribute("style", `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`);
-                }
-            }
-        }
-    }
+            const [rowOnMap, colOnMap] = [displayRowsFrom + r, displayColsFrom + c];
 
-    //app.$displayTable.style.display = "block";
+            // check if there is any entity on row col
+            if (arena.gameEntities[rowOnMap] && arena.gameEntities[rowOnMap][colOnMap]) {
+                const id = arena.gameEntities[rowOnMap][colOnMap].id;
+
+                // clear even if row or col is out of range
+                app["$entity_" + id].setAttribute("style", `display: none;`);
+
+                // repaint the ones in range
+                if (r >= 0 && c >= 0 && r < arena.tableRowNum && c < arena.tableColNum) {
+                    const newStyle = `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`;
+                    app["$entity_" + id].setAttribute("style", newStyle);
+                } // if in range
+            } // if entity 
+        } // for col
+    } // for row
 
     t1 = performance.now();
     app.performanceAvg.push(t1 - t0)
@@ -454,13 +470,13 @@ function placeTableAndCharsOnMap() {
 
 
 function drawAllEntitiesOnGameBox() {
-    Object.keys(arena.gameEntities).forEach(coord => {
-        switch (arena.gameEntities[coord].type) {
-            case "wallBrick": { drawSingleWallBlock(arena.gameEntities[coord], coord); break; }
+    arena.gameEntities.forEach((row, r) => row.map((col, c) => {
+        if (!col) return;
+        switch (col.type) {
+            case "wallBrick": { drawSingleWallBlock(arena.gameEntities[r][c], r, c); break; }
         }
-    });
+    }));
 }
-
 
 
 /*##################################################################################################
@@ -501,18 +517,20 @@ function drawCharacterOnGameBox(coords) {
     coords.forEach((ch, i) => {
         const svg = createSvg({ width: l, height: l });
         headRect = svgDraw("rect", { x: 0, y: 0, width: l, height: l, fill: "white" });
+
+        const ind = ch[0] * app.level.dimension.rows + ch[1];
+        svg.id = `entity_${ind}`;
+        arena.gameEntities[ch[0]][ch[1]].id = ind;
         svg.setAttribute("style", `display: none;`);
-        svg.id = `entity_r${ch[0]}c${ch[1]}`;
+        app[`$entity_${ind}`] = svg;
         svg.appendChild(headRect);
-        app[`$entity_r${ch[0]}c${ch[1]}`] = svg;
         app.$entityBox.appendChild(svg);
     });
 }
 
 
 
-function drawSingleWallBlock(entity, coords) {
-    const [row, col] = coords.match(/\d+/g);
+function drawSingleWallBlock(entity, row, col) {
     const model = entity.model;
     const l = app.gameTableCellLength + 1;
     const svg = createSvg({ width: l, height: l });
@@ -570,9 +588,11 @@ function drawSingleWallBlock(entity, coords) {
         svg.appendChild(line4);
     }
 
-    svg.id = `entity_r${row}c${col}`;
+    const ind = row * app.level.dimension.rows + col;
+    svg.id = `entity_${ind}`;
+    arena.gameEntities[row][col].id = ind;
     svg.setAttribute("style", `display: none;`);
-    app[`$entity_r${row}c${col}`] = svg;
+    app[`$entity_${ind}`] = svg;
     app.$entityBox.appendChild(svg);
 }
 
@@ -589,8 +609,8 @@ const gameTimer = setInterval(() => {
     // Character
     let ms = 0;
     switch (arena.charSpeed) {
-        case 1: { ms = 120; break; }
-        case 2: { ms = 80; break; }
+        case 1: { ms = 160; break; }
+        case 2: { ms = 90; break; }
         case 3: { ms = 50; break; }
         case 4: { ms = 30; break; }
         case 5: { ms = 20; break; }
@@ -614,36 +634,39 @@ const gameTimer = setInterval(() => {
 function moveCharacter(row, col) {
     // check if next move is in maps range or collides into other entity
     let outOfRange = collides = false;
-    const characterCoords = [...findEntitiesRowColIfType("charHead").concat(findEntitiesRowColIfType("charBody"))]; // loose reference
-    if (characterCoords[0][0] + row < 0 || characterCoords[0][1] + col < 0) outOfRange = true;
-    if (characterCoords[0][0] + row > app.level.dimension.rows - 1 || characterCoords[0][1] + col > app.level.dimension.cols - 1) outOfRange = true;
-    if (arena.gameEntities[`r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`]) collides = true;
-    if (outOfRange || collides) return void (0);
+    const characterCoords = [...findEntitiesRowColIfType("charHead").concat(findEntitiesRowColIfType("charBody"))]
+        .sort((p, c) => arena.gameEntities[p[0]][p[1]].index - arena.gameEntities[c[0]][c[1]].index); // sort by index!
+    const headCoord = characterCoords[0];
 
-    // copy objs & delete character from entities obj
-    const characterObjCopys = []
-    characterCoords.forEach(coords => {
-        characterObjCopys.push(arena.gameEntities[`r${coords[0]}c${coords[1]}`]);
-        delete arena.gameEntities[`r${coords[0]}c${coords[1]}`];
-    });
-    characterObjCopys.sort((a, b) => a.index - b.index);
+    // check if coords in range (else arr throws error)
+    if (headCoord[0] + row < 0 || headCoord[1] + col < 0) outOfRange = true;
+    if (headCoord[0] + row > app.level.dimension.rows - 1 || headCoord[1] + col > app.level.dimension.cols - 1) outOfRange = true;
+    if (outOfRange) return void (0);
 
-    // calculate new positions
-    arena.gameEntities[`r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`] = characterObjCopys[0];
-    console.log(app[`$entity_r${characterCoords[0][0]}c${characterCoords[0][1]}`])
-    // = app[`$entity_r${characterCoords[0][0] + row}c${characterCoords[0][1] + col}`]
-    characterCoords.pop();
-    if (characterObjCopys.length > 1) {
-        characterCoords.forEach((coords, i) => { arena.gameEntities[`r${coords[0]}c${coords[1]}`] = characterObjCopys[i + 1]; });
-    }
+    // check if coords occupied by other entity
+    if (arena.gameEntities[headCoord[0] + row][headCoord[1] + col]) collides = true;
 
-    // direction must be determined if movement doesn't end with collision
+    // set direction
     switch ("" + row + col) {
         case "-10": { arena.charDirection = "up"; break; }
         case "10": { arena.charDirection = "down"; break; }
         case "0-1": { arena.charDirection = "left"; break; }
         case "01": { arena.charDirection = "right"; }
     }
+    if (collides) return void (0);
+
+    // copy character objs
+    const charObjs = characterCoords
+        .map(coords => arena.gameEntities[coords[0]][coords[1]])
+        .sort((p, c) => p.index - c.index); // sort by index!
+
+    // delete old arr items and move coords
+    characterCoords.forEach(coords => arena.gameEntities[coords[0]][coords[1]] = undefined);
+    characterCoords.unshift([headCoord[0] + row, headCoord[1] + col]);
+    characterCoords.pop();
+
+    // assign new items to corrisponding arr slots
+    characterCoords.forEach((coords, i) => arena.gameEntities[coords[0]][coords[1]] = charObjs[i]);
 
     placeTableAndCharsOnMap();
 }
