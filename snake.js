@@ -198,8 +198,6 @@ function startLevel() {
     // assign current level to app obj
     app.level = app.levels[app.currentLevel - 1];
 
-    arena.gameEntities = buildGameArenaEntitiesObject(app.level.objects);
-
     buildGameTableArea();
 }
 
@@ -225,7 +223,7 @@ function buildGameArenaEntitiesObject(obj) {
 
         // choordinates must connect to the previous element
         if (i !== 0) { // first ind [0] has no previous connenction
-            const connectR = connectC = false;
+            let connectR = connectC = false;
             const prevR = coordArr[i - 1][0];
             const prevC = coordArr[i - 1][1];
             if (Math.abs(coord[0] - prevR) === 1 && coord[1] === prevC) connectR = true;
@@ -234,7 +232,9 @@ function buildGameArenaEntitiesObject(obj) {
         }
 
         entities[coord[0]][coord[1]] = {
-            type: (i === 0 ? "charHead" : "charBody"),
+            type: (i === 0 ? "charHead" : i === app.level.gameCharacterCoords.length - 1 ? "charTail" : "charBody"),
+            drawMethod: "dinamic", // char can look differently by every redraw
+            skins: [], // the possible skins
             index: i
         }
     });
@@ -272,7 +272,8 @@ function buildGameArenaEntitiesObject(obj) {
                         type: o.type,
                         model: modifiedModel || model,
                         colorSequence: createSequence(),
-                        colorMode: o.colorMode || "brick"
+                        colorMode: o.colorMode || "brick",
+                        drawMethod: "static"  // by every redraw it looks the same
                     };
                 }); // end of msp coord
             } // end of case wallBrick
@@ -395,8 +396,11 @@ function buildGameTableArea() {
     app.$entityBox = entityBox;
     app.$gameBox.appendChild(entityBox);
 
+    arena.gameEntities = buildGameArenaEntitiesObject(app.level.objects);
+    console.log(arena.gameEntities)
+
     drawAllEntitiesOnGameBox(app.level.objects);
-    drawCharacterOnGameBox(app.level.gameCharacterCoords);
+    drawCharacterSkins(app.level.gameCharacterCoords);
 
     arena.charDirection = arena.charDirection || app.level.gameCharacterDirection;
     app.gameTableIsDrawn = true;
@@ -458,12 +462,19 @@ function placeTableAndCharsOnMap() {
                 const id = arena.gameEntities[rowOnMap][colOnMap].id;
 
                 // clear even if row or col is out of range
-                app["$entity_" + id].setAttribute("style", `display: none;`);
+                if (arena.gameEntities[rowOnMap][colOnMap].drawMethod === "static") {
+                    app["$entity_" + id].setAttribute("style", `display: none;`);
+                } else { [...app["$entity_" + id].children].forEach(svg => svg.style.display = "none"); }
 
                 // repaint the ones in range
                 if (r >= 0 && c >= 0 && r < arena.tableRowNum && c < arena.tableColNum) {
-                    const newStyle = `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`;
-                    app["$entity_" + id].setAttribute("style", newStyle);
+                    if (arena.gameEntities[rowOnMap][colOnMap].drawMethod === "static") {
+                        const newStyle = `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`;
+                        app["$entity_" + id].setAttribute("style", newStyle);
+                    } // if static
+                    else {
+                        displayCaracterAndNPCs(arena.gameEntities[rowOnMap][colOnMap], id, r, c);
+                    } // if dinamic
                 } // if in range
             } // if entity 
         } // for col
@@ -484,6 +495,40 @@ function drawAllEntitiesOnGameBox() {
         }
     }));
 }
+
+
+function displayCaracterAndNPCs(entity, id, r, c) {
+    switch (entity.type) {
+        case "charHead": {
+            const dir = arena.charDirection || app.level.gameCharacterDirection;
+            const skin = entity.skins.find(sk => sk["head_" + dir]);
+            const svg = skin["head_" + dir];
+            const newStyle = `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`;
+            svg.setAttribute("style", newStyle);
+            break;
+        }
+        case "charBody": {
+            const bodyInd = entity.index;
+            const [prev, curr, next] = [app.level.gameCharacterCoords[bodyInd - 1], app.level.gameCharacterCoords[bodyInd], app.level.gameCharacterCoords[bodyInd + 1]];
+
+            console.log(bodyInd, prev, curr, next);
+
+            const skin = entity.skins.find(sk => sk["body_hor_up"]);
+            const svg = skin["body_hor_up"];
+            const newStyle = `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`;
+            svg.setAttribute("style", newStyle);
+            break;
+        }
+        case "charTail": {
+            const skin = entity.skins.find(sk => sk["tail"]);
+            const svg = skin["tail"];
+            const newStyle = `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`;
+            svg.setAttribute("style", newStyle);
+            break;
+        }
+    } // end of switch entity type
+}
+
 
 
 /*##################################################################################################
@@ -518,20 +563,100 @@ const getBrickColor = (n, e) => {
 
 
 
-function drawCharacterOnGameBox(coords) {
+function drawCharacterSkins(coords) {
     const l = app.gameTableCellLength + 1;
+    const c1 = "rgb(128, 255, 217)";
+    const c2 = "rgba(128, 255, 217, 0.25)";
 
-    coords.forEach((ch, i) => {
-        const svg = createSvg({ width: l, height: l });
-        headRect = svgDraw("rect", { x: 0, y: 0, width: l, height: l, fill: "white" });
+    coords.forEach((ch, i, choordsArr) => {
+        const skinBox = document.createElement("div");
+        skinBox.setAttribute("style", `width: ${l}px; height: ${l}px;`);
 
         const ind = ch[0] * app.level.dimension.rows + ch[1];
-        svg.id = `entity_${ind}`;
+        skinBox.id = `entity_${ind}`;
         arena.gameEntities[ch[0]][ch[1]].id = ind;
-        svg.setAttribute("style", `display: none;`);
-        app[`$entity_${ind}`] = svg;
-        svg.appendChild(headRect);
-        app.$entityBox.appendChild(svg);
+
+        // HEAD
+        if (i === 0) {
+            // HEAD UP
+            const svgHeadUp = createSvg({ width: l - 1, height: l - 1 });
+            svgHeadUp.setAttribute("style", `display: block;`);
+            const pathUp = `M ${l / 5} ${l / 2} q ${l / 5 * 1.5} -${l - l / 5} ${l - l / 5 * 2} 0 v ${l / 2} h -${l - l / 5 * 2} z`;
+            const facePathUp = svgDraw("path", { d: pathUp, stroke: c1, fill: c2 });
+            svgHeadUp.appendChild(facePathUp);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "head_up": svgHeadUp });
+            skinBox.appendChild(svgHeadUp);
+
+            // HEAD DOWN
+            const svgHeadDown = createSvg({ width: l - 1, height: l - 1 });
+            svgHeadDown.setAttribute("style", `display: block;`);
+            const pathDown = `M ${l / 5} ${l / 2} q ${l / 5 * 1.5} ${l - l / 5} ${l - l / 5 * 2} 0 v -${l / 2 + 1} h -${l - l / 5 * 2} z`;
+            const facePathDown = svgDraw("path", { d: pathDown, stroke: c1, fill: c2 });
+            svgHeadDown.appendChild(facePathDown);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "head_down": svgHeadDown });
+            skinBox.appendChild(svgHeadDown);
+
+            // HEAD LEFT
+            const svgHeadLeft = createSvg({ width: l - 1, height: l - 1 });
+            svgHeadLeft.setAttribute("style", `display: block;`);
+            const pathLeft = `M ${l / 2} ${l / 5} q -${l - 3} ${l / 5 * 1.5} 0 ${l / 5 * 1.5 * 2} h ${l / 2} v -${l - l / 5 * 2} z `;
+            const facePathLeft = svgDraw("path", { d: pathLeft, stroke: c1, fill: c2 });
+            svgHeadLeft.appendChild(facePathLeft);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "head_left": svgHeadLeft });
+            skinBox.appendChild(svgHeadLeft);
+
+            // HEAD RIGHT
+            const svgHeadRight = createSvg({ width: l - 1, height: l - 1 });
+            svgHeadRight.setAttribute("style", `display: block;`);
+            const pathRight = `M ${l / 2} ${l - l / 5} q ${l - 3} -${l / 5 * 1.5} 0 -${l / 5 * 1.5 * 2} h -${l / 2 + 1} v ${l - l / 5 * 2} z `;
+            const facePathRight = svgDraw("path", { d: pathRight, stroke: c1, fill: c2 });
+            svgHeadRight.appendChild(facePathRight);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "head_right": svgHeadRight });
+            skinBox.appendChild(svgHeadRight);
+        }
+        // TAIL
+        else if (i === choordsArr.length - 1) {
+            const svgHeadRight = createSvg({ width: l - 1, height: l - 1 });
+            svgHeadRight.setAttribute("style", `display: block;`);
+            const pathRight = `M ${l / 2} ${l - l / 5} q ${l - 3} -${l / 5 * 1.5} 0 -${l / 5 * 1.5 * 2} h -${l / 2 + 1} v ${l - l / 5 * 2} z `;
+            const facePathRight = svgDraw("path", { d: pathRight, stroke: c1, fill: c2 });
+            svgHeadRight.appendChild(facePathRight);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "tail": svgHeadRight });
+            skinBox.appendChild(svgHeadRight);
+        }
+        // BODY
+        else {
+            // HORIZONTAL STRAIGHT
+            const svgBodyHorStraight = createSvg({ width: l - 1, height: l - 1 });
+            svgBodyHorStraight.setAttribute("style", `display: block;`);
+            const pathHorStr = `M -1 ${l / 5} h ${l + 2} v ${l - l / 5 * 2} h -${l + 2} z `;
+            const bodyPathHorStr = svgDraw("path", { d: pathHorStr, stroke: c1, fill: c2 });
+            svgBodyHorStraight.appendChild(bodyPathHorStr);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_hor_str": svgBodyHorStraight });
+            skinBox.appendChild(svgBodyHorStraight);
+
+            // HORIZONTAL UP
+            const svgBodyHorUp = createSvg({ width: l - 1, height: l - 1 });
+            svgBodyHorUp.setAttribute("style", `display: block;`);
+            const pathHorUp = `m -1 ${l / 5} h ${l / 5 + 1} v -${l / 5 + 1} h ${l - l / 5 * 2} v ${l / 5 + 1} 
+            a -${l - l / 5 * 2} -${l - l / 5 * 2} 0 0 1 -${l - l / 5 * 2} ${l - l / 5 * 2} h -${l / 5 + 1} z`;
+            const bodyPathHorUp = svgDraw("path", { d: pathHorUp, stroke: c1, fill: c2 });
+            svgBodyHorUp.appendChild(bodyPathHorUp);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_hor_up": svgBodyHorUp });
+            skinBox.appendChild(svgBodyHorUp);
+
+            // VERTICAL STRAIGHT
+            const svgBodyVerStraight = createSvg({ width: l - 1, height: l - 1 });
+            svgBodyVerStraight.setAttribute("style", `display: block;`);
+            const pathVerStr = `M ${l / 5} -1 v ${l + 2} h ${l - l / 5 * 2} v -${l + 2} z `;
+            const bodyPathVerStr = svgDraw("path", { d: pathVerStr, stroke: c1, fill: c2 });
+            svgBodyVerStraight.appendChild(bodyPathVerStr);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_ver_str": svgBodyVerStraight });
+            skinBox.appendChild(svgBodyVerStraight);
+        }
+
+        app.$entityBox.appendChild(skinBox);
+        app[`$entity_${ind}`] = skinBox;
     });
 }
 
@@ -641,7 +766,7 @@ const gameTimer = setInterval(() => {
 function moveCharacter(row, col) {
     // check if next move is in maps range or collides into other entity
     let outOfRange = collides = false;
-    const characterCoords = [...findEntitiesRowColIfType("charHead").concat(findEntitiesRowColIfType("charBody"))]
+    const characterCoords = [...findEntitiesRowColIfType("charHead").concat(findEntitiesRowColIfType("charBody")).concat(findEntitiesRowColIfType("charTail"))]
         .sort((p, c) => arena.gameEntities[p[0]][p[1]].index - arena.gameEntities[c[0]][c[1]].index); // sort by index!
     const headCoord = characterCoords[0];
 
@@ -650,7 +775,7 @@ function moveCharacter(row, col) {
     if (headCoord[0] + row > app.level.dimension.rows - 1 || headCoord[1] + col > app.level.dimension.cols - 1) outOfRange = true;
     if (outOfRange) return void (0);
 
-    // check if coords occupied by other entity
+    // check if coords occupied by another entity
     if (arena.gameEntities[headCoord[0] + row][headCoord[1] + col]) collides = true;
 
     // set direction
@@ -679,5 +804,3 @@ function moveCharacter(row, col) {
 
     placeTableAndCharsOnMap();
 }
-
-
