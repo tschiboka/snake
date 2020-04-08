@@ -511,10 +511,21 @@ function displayCaracterAndNPCs(entity, id, r, c) {
             const bodyInd = entity.index;
             const [prev, curr, next] = [app.level.gameCharacterCoords[bodyInd - 1], app.level.gameCharacterCoords[bodyInd], app.level.gameCharacterCoords[bodyInd + 1]];
 
-            console.log(bodyInd, prev, curr, next);
+            let jointType = undefined;
+            if (prev[0] === curr[0] && curr[0] === next[0]) jointType = "body_hor_str";
+            else if (prev[1] === curr[1] && curr[1] === next[1]) jointType = "body_ver_str";
+            else if (prev[0] === curr[0] && prev[1] === curr[1] - 1 && next[0] === curr[0] - 1 && next[1] === curr[1]) jointType = "body_hor_up";
+            else if (prev[0] === curr[0] && prev[1] === curr[1] + 1 && next[0] === curr[0] - 1 && next[1] === curr[1]) jointType = "body_ver_left";
+            else if (prev[0] === curr[0] - 1 && prev[1] === curr[1] && next[0] === curr[0] && next[1] === curr[1] - 1) jointType = "body_hor_up";
+            else if (prev[0] === curr[0] - 1 && prev[1] === curr[1] && next[0] === curr[0] && next[1] === curr[1] + 1) jointType = "body_ver_left";
+            else if (prev[0] === curr[0] + 1 && prev[1] === curr[1] && next[0] === curr[0] && next[1] === curr[1] - 1) jointType = "body_hor_down";
+            else if (prev[0] === curr[0] + 1 && prev[1] === curr[1] && next[0] === curr[0] && next[1] === curr[1] + 1) jointType = "body_ver_right";
+            else if (prev[0] === curr[0] && prev[1] === curr[1] - 1 && next[0] === curr[0] + 1 && next[1] === curr[1]) jointType = "body_hor_down";
+            else if (prev[0] === curr[0] && prev[1] === curr[1] + 1 && next[0] === curr[0] + 1 && next[1] === curr[1]) jointType = "body_ver_right";
+            else jointType = "body_fail";
 
-            const skin = entity.skins.find(sk => sk["body_ver_right"]);
-            const svg = skin["body_ver_right"];
+            const skin = entity.skins.find(sk => sk[jointType]);
+            const svg = skin[jointType];
             const newStyle = `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`;
             svg.setAttribute("style", newStyle);
             break;
@@ -683,6 +694,14 @@ function drawCharacterSkins(coords) {
             svgBodyVerRight.appendChild(bodyPathVerRight);
             arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_ver_right": svgBodyVerRight });
             skinBox.appendChild(svgBodyVerRight);
+
+            // FAIL
+            const svgBodyFail = createSvg({ width: l - 1, height: l - 1 });
+            svgBodyFail.setAttribute("style", `display: block;`);
+            const bodyFail = svgDraw("rect", { x: 0, y: 0, width: l, height: l, stroke: c1, fill: "deeppink" });
+            svgBodyFail.appendChild(bodyFail);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_fail": svgBodyFail });
+            skinBox.appendChild(svgBodyFail);
         }
 
         app.$entityBox.appendChild(skinBox);
