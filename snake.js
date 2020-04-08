@@ -513,8 +513,8 @@ function displayCaracterAndNPCs(entity, id, r, c) {
 
             console.log(bodyInd, prev, curr, next);
 
-            const skin = entity.skins.find(sk => sk["body_hor_up"]);
-            const svg = skin["body_hor_up"];
+            const skin = entity.skins.find(sk => sk["body_ver_right"]);
+            const svg = skin["body_ver_right"];
             const newStyle = `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`;
             svg.setAttribute("style", newStyle);
             break;
@@ -629,7 +629,7 @@ function drawCharacterSkins(coords) {
             // HORIZONTAL STRAIGHT
             const svgBodyHorStraight = createSvg({ width: l - 1, height: l - 1 });
             svgBodyHorStraight.setAttribute("style", `display: block;`);
-            const pathHorStr = `M -1 ${l / 5} h ${l + 2} v ${l - l / 5 * 2} h -${l + 2} z `;
+            const pathHorStr = `M -1 ${l / 5} h ${l + 2} v ${l - l / 5 * 2} h -${l + 2} z`;
             const bodyPathHorStr = svgDraw("path", { d: pathHorStr, stroke: c1, fill: c2 });
             svgBodyHorStraight.appendChild(bodyPathHorStr);
             arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_hor_str": svgBodyHorStraight });
@@ -645,14 +645,44 @@ function drawCharacterSkins(coords) {
             arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_hor_up": svgBodyHorUp });
             skinBox.appendChild(svgBodyHorUp);
 
+            // HORIZONTAL DOWN
+            const svgBodyHorDown = createSvg({ width: l - 1, height: l - 1 });
+            svgBodyHorDown.setAttribute("style", `display: block;`);
+            const pathHorDown = `m -1 ${l / 5} h ${l / 5 + 1} a ${l - l / 5 * 2} ${l - l / 5 * 2} 0 0 1 
+            ${l - l / 5 * 2} ${l - l / 5 * 2} v ${l / 5} h -${l - l / 5 * 2} v -${l / 5} h -${l / 5 + 1} z`;
+            const bodyPathHorDown = svgDraw("path", { d: pathHorDown, stroke: c1, fill: c2 });
+            svgBodyHorDown.appendChild(bodyPathHorDown);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_hor_down": svgBodyHorDown });
+            skinBox.appendChild(svgBodyHorDown);
+
             // VERTICAL STRAIGHT
             const svgBodyVerStraight = createSvg({ width: l - 1, height: l - 1 });
             svgBodyVerStraight.setAttribute("style", `display: block;`);
-            const pathVerStr = `M ${l / 5} -1 v ${l + 2} h ${l - l / 5 * 2} v -${l + 2} z `;
+            const pathVerStr = `M ${l / 5} -1 v ${l + 2} h ${l - l / 5 * 2} v -${l + 2} z`;
             const bodyPathVerStr = svgDraw("path", { d: pathVerStr, stroke: c1, fill: c2 });
             svgBodyVerStraight.appendChild(bodyPathVerStr);
             arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_ver_str": svgBodyVerStraight });
             skinBox.appendChild(svgBodyVerStraight);
+
+            // VERTICAL LEFT
+            const svgBodyVerLeft = createSvg({ width: l - 1, height: l - 1 });
+            svgBodyVerLeft.setAttribute("style", `display: block;`);
+            const pathVerLeft = `m ${l} ${l / 5} h -${l / 5} v -${l / 5 + 1} h -${l - l / 5 * 2} v ${l / 5 + 1} 
+            a ${l - l / 5 * 2} ${l - l / 5 * 2} 0 0 0 ${l - l / 5 * 2} ${l - l / 5 * 2} h ${l / 5} z`;
+            const bodyPathVerLeft = svgDraw("path", { d: pathVerLeft, stroke: c1, fill: c2 });
+            svgBodyVerLeft.appendChild(bodyPathVerLeft);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_ver_left": svgBodyVerLeft });
+            skinBox.appendChild(svgBodyVerLeft);
+
+            // VERTICAL RIGHT
+            const svgBodyVerRight = createSvg({ width: l - 1, height: l - 1 });
+            svgBodyVerRight.setAttribute("style", `display: block;`);
+            const pathVerRight = `m ${l} ${l / 5} h -${l / 5} a -${l - l / 5 * 2} -${l - l / 5 * 2} 0 0 0 
+            -${l - l / 5 * 2} ${l - l / 5 * 2} v ${l / 5} h ${l - l / 5 * 2} v -${l / 5} h ${l / 5} z`;
+            const bodyPathVerRight = svgDraw("path", { d: pathVerRight, stroke: c1, fill: c2 });
+            svgBodyVerRight.appendChild(bodyPathVerRight);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_ver_right": svgBodyVerRight });
+            skinBox.appendChild(svgBodyVerRight);
         }
 
         app.$entityBox.appendChild(skinBox);
