@@ -397,7 +397,6 @@ function buildGameTableArea() {
     app.$gameBox.appendChild(entityBox);
 
     arena.gameEntities = buildGameArenaEntitiesObject(app.level.objects);
-    console.log(arena.gameEntities)
 
     drawAllEntitiesOnGameBox(app.level.objects);
     drawCharacterSkins(app.level.gameCharacterCoords);
@@ -514,15 +513,14 @@ function displayCaracterAndNPCs(entity, id, r, c) {
             let jointType = undefined;
             if (prev[0] === curr[0] && curr[0] === next[0]) jointType = "body_hor_str";
             else if (prev[1] === curr[1] && curr[1] === next[1]) jointType = "body_ver_str";
-            else if (prev[0] === curr[0] && prev[1] === curr[1] - 1 && next[0] === curr[0] - 1 && next[1] === curr[1]) jointType = "body_hor_up";
+            else if (prev[0] === curr[0] && prev[1] === curr[1] + 1 && next[0] === curr[0] + 1 && next[1] === curr[1]) jointType = "body_ver_right";
             else if (prev[0] === curr[0] && prev[1] === curr[1] + 1 && next[0] === curr[0] - 1 && next[1] === curr[1]) jointType = "body_ver_left";
-            else if (prev[0] === curr[0] - 1 && prev[1] === curr[1] && next[0] === curr[0] && next[1] === curr[1] - 1) jointType = "body_hor_up";
-            else if (prev[0] === curr[0] - 1 && prev[1] === curr[1] && next[0] === curr[0] && next[1] === curr[1] + 1) jointType = "body_ver_left";
+            else if (prev[0] === curr[0] && prev[1] === curr[1] - 1 && next[0] === curr[0] - 1 && next[1] === curr[1]) jointType = "body_hor_up";
+            else if (prev[0] === curr[0] && prev[1] === curr[1] - 1 && next[0] === curr[0] + 1 && next[1] === curr[1]) jointType = "body_hor_down";
             else if (prev[0] === curr[0] + 1 && prev[1] === curr[1] && next[0] === curr[0] && next[1] === curr[1] - 1) jointType = "body_hor_down";
             else if (prev[0] === curr[0] + 1 && prev[1] === curr[1] && next[0] === curr[0] && next[1] === curr[1] + 1) jointType = "body_ver_right";
-            else if (prev[0] === curr[0] && prev[1] === curr[1] - 1 && next[0] === curr[0] + 1 && next[1] === curr[1]) jointType = "body_hor_down";
-            else if (prev[0] === curr[0] && prev[1] === curr[1] + 1 && next[0] === curr[0] + 1 && next[1] === curr[1]) jointType = "body_ver_right";
-            else jointType = "body_fail";
+            else if (prev[0] === curr[0] - 1 && prev[1] === curr[1] && next[0] === curr[0] && next[1] === curr[1] - 1) jointType = "body_hor_up";
+            else if (prev[0] === curr[0] - 1 && prev[1] === curr[1] && next[0] === curr[0] && next[1] === curr[1] + 1) jointType = "body_ver_left";
 
             const skin = entity.skins.find(sk => sk[jointType]);
             const svg = skin[jointType];
@@ -531,8 +529,16 @@ function displayCaracterAndNPCs(entity, id, r, c) {
             break;
         }
         case "charTail": {
-            const skin = entity.skins.find(sk => sk["tail"]);
-            const svg = skin["tail"];
+            const tailInd = entity.index;
+            const [prev, curr] = [app.level.gameCharacterCoords[tailInd - 1], app.level.gameCharacterCoords[tailInd]];
+            let jointType = undefined;
+            if (prev[0] < curr[0]) jointType = "tail_from_N";
+            if (prev[0] > curr[0]) jointType = "tail_from_S";
+            if (prev[1] < curr[1]) jointType = "tail_from_W";
+            if (prev[1] > curr[1]) jointType = "tail_from_E";
+
+            const skin = entity.skins.find(sk => sk[jointType]);
+            const svg = skin[jointType];
             const newStyle = `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`;
             svg.setAttribute("style", newStyle);
             break;
@@ -594,7 +600,11 @@ function drawCharacterSkins(coords) {
             svgHeadUp.setAttribute("style", `display: block;`);
             const pathUp = `M ${l / 5} ${l / 2} q ${l / 5 * 1.5} -${l - l / 5} ${l - l / 5 * 2} 0 v ${l / 2} h -${l - l / 5 * 2} z`;
             const facePathUp = svgDraw("path", { d: pathUp, stroke: c1, fill: c2 });
+            const eye1Up = svgDraw("circle", { cx: l / 3 + 1, cy: l / 3 * 2, r: l / 10, fill: "rgba(0, 0, 0, 0.85)" });
+            const eye2Up = svgDraw("circle", { cx: l - l / 3 - 1, cy: l / 3 * 2, r: l / 10, fill: "rgba(0, 0, 0, 0.85)" });
             svgHeadUp.appendChild(facePathUp);
+            svgHeadUp.appendChild(eye1Up);
+            svgHeadUp.appendChild(eye2Up);
             arena.gameEntities[ch[0]][ch[1]].skins.push({ "head_up": svgHeadUp });
             skinBox.appendChild(svgHeadUp);
 
@@ -603,7 +613,11 @@ function drawCharacterSkins(coords) {
             svgHeadDown.setAttribute("style", `display: block;`);
             const pathDown = `M ${l / 5} ${l / 2} q ${l / 5 * 1.5} ${l - l / 5} ${l - l / 5 * 2} 0 v -${l / 2 + 1} h -${l - l / 5 * 2} z`;
             const facePathDown = svgDraw("path", { d: pathDown, stroke: c1, fill: c2 });
+            const eye1Down = svgDraw("circle", { cx: l / 3 + 1, cy: l / 3, r: l / 10, fill: "rgba(0, 0, 0, 0.85)" });
+            const eye2Down = svgDraw("circle", { cx: l - l / 3 - 1, cy: l / 3, r: l / 10, fill: "rgba(0, 0, 0, 0.85)" });
             svgHeadDown.appendChild(facePathDown);
+            svgHeadDown.appendChild(eye1Down);
+            svgHeadDown.appendChild(eye2Down);
             arena.gameEntities[ch[0]][ch[1]].skins.push({ "head_down": svgHeadDown });
             skinBox.appendChild(svgHeadDown);
 
@@ -612,7 +626,11 @@ function drawCharacterSkins(coords) {
             svgHeadLeft.setAttribute("style", `display: block;`);
             const pathLeft = `M ${l / 2} ${l / 5} q -${l - 3} ${l / 5 * 1.5} 0 ${l / 5 * 1.5 * 2} h ${l / 2} v -${l - l / 5 * 2} z `;
             const facePathLeft = svgDraw("path", { d: pathLeft, stroke: c1, fill: c2 });
+            const eye1Left = svgDraw("circle", { cx: l / 3 * 2, cy: l / 3 + 1, r: l / 10, fill: "rgba(0, 0, 0, 0.85)" });
+            const eye2Left = svgDraw("circle", { cx: l / 3 * 2, cy: l - l / 3 - 1, r: l / 10, fill: "rgba(0, 0, 0, 0.85)" });
             svgHeadLeft.appendChild(facePathLeft);
+            svgHeadLeft.appendChild(eye1Left);
+            svgHeadLeft.appendChild(eye2Left);
             arena.gameEntities[ch[0]][ch[1]].skins.push({ "head_left": svgHeadLeft });
             skinBox.appendChild(svgHeadLeft);
 
@@ -621,19 +639,52 @@ function drawCharacterSkins(coords) {
             svgHeadRight.setAttribute("style", `display: block;`);
             const pathRight = `M ${l / 2} ${l - l / 5} q ${l - 3} -${l / 5 * 1.5} 0 -${l / 5 * 1.5 * 2} h -${l / 2 + 1} v ${l - l / 5 * 2} z `;
             const facePathRight = svgDraw("path", { d: pathRight, stroke: c1, fill: c2 });
+            const eye1Right = svgDraw("circle", { cx: l / 3, cy: l / 3 + 1, r: l / 10, fill: "rgba(0, 0, 0, 0.85)" });
+            const eye2Right = svgDraw("circle", { cx: l / 3, cy: l - l / 3 - 1, r: l / 10, fill: "rgba(0, 0, 0, 0.85)" });
             svgHeadRight.appendChild(facePathRight);
+            svgHeadRight.appendChild(eye1Right);
+            svgHeadRight.appendChild(eye2Right);
             arena.gameEntities[ch[0]][ch[1]].skins.push({ "head_right": svgHeadRight });
             skinBox.appendChild(svgHeadRight);
         }
         // TAIL
         else if (i === choordsArr.length - 1) {
-            const svgHeadRight = createSvg({ width: l - 1, height: l - 1 });
-            svgHeadRight.setAttribute("style", `display: block;`);
-            const pathRight = `M ${l / 2} ${l - l / 5} q ${l - 3} -${l / 5 * 1.5} 0 -${l / 5 * 1.5 * 2} h -${l / 2 + 1} v ${l - l / 5 * 2} z `;
-            const facePathRight = svgDraw("path", { d: pathRight, stroke: c1, fill: c2 });
-            svgHeadRight.appendChild(facePathRight);
-            arena.gameEntities[ch[0]][ch[1]].skins.push({ "tail": svgHeadRight });
-            skinBox.appendChild(svgHeadRight);
+            // TAIL JOINS FROM NORTH
+            const svgTailFromNorth = createSvg({ width: l - 1, height: l - 1 });
+            svgTailFromNorth.setAttribute("style", `display: block;`);
+            const pathTailN = `m ${l / 5} -1 v ${l / 5} l ${l / 2 - l / 5} ${l - l / 5 - 1} l ${l / 2 - l / 5} -${l - l / 5 - 1} v -${l / 5 + 1} z`;
+            const tailN = svgDraw("path", { d: pathTailN, stroke: c1, fill: c2 });
+            svgTailFromNorth.appendChild(tailN);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "tail_from_N": svgTailFromNorth });
+            skinBox.appendChild(svgTailFromNorth);
+
+            // TAIL JOINS FROM SOUTH
+            const svgTailFromSouth = createSvg({ width: l - 1, height: l - 1 });
+            svgTailFromSouth.setAttribute("style", `display: block;`);
+            const pathTailS = `m ${l / 5} ${l} v -${l / 5} l ${l / 2 - l / 5} -${l - l / 5} l ${l / 2 - l / 5} ${l - l / 5} v ${l / 5} z`;
+            const tailS = svgDraw("path", { d: pathTailS, stroke: c1, fill: c2 });
+            svgTailFromSouth.appendChild(tailS);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "tail_from_S": svgTailFromSouth });
+            skinBox.appendChild(svgTailFromSouth);
+
+            // TAIL JOINS FROM WEST
+            const svgTailFromWest = createSvg({ width: l - 1, height: l - 1 });
+            svgTailFromWest.setAttribute("style", `display: block;`);
+            const pathTailW = `m -1 ${l / 5} h ${l / 5} l ${l - l / 5} ${l / 2 - l / 5} l -${l - l / 5} ${l / 2 - l / 5} h -${l / 5 + 1} z`;
+            const tailW = svgDraw("path", { d: pathTailW, stroke: c1, fill: c2 });
+            svgTailFromWest.appendChild(tailW);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "tail_from_W": svgTailFromWest });
+            skinBox.appendChild(svgTailFromWest);
+
+            // TAIL JOINS FROM EAST
+            const svgTailFromEast = createSvg({ width: l - 1, height: l - 1 });
+            svgTailFromEast.setAttribute("style", `display: block;`);
+            const pathTailE = `m ${l} ${l / 5} h -${l / 5} l -${l - l / 5} ${l / 2 - l / 5} l ${l - l / 5} ${l / 2 - l / 5} h ${l / 5} z`;
+            const tailE = svgDraw("path", { d: pathTailE, stroke: c1, fill: c2 });
+            svgTailFromEast.appendChild(tailE);
+            arena.gameEntities[ch[0]][ch[1]].skins.push({ "tail_from_E": svgTailFromEast });
+            skinBox.appendChild(svgTailFromEast);
+
         }
         // BODY
         else {
@@ -694,14 +745,6 @@ function drawCharacterSkins(coords) {
             svgBodyVerRight.appendChild(bodyPathVerRight);
             arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_ver_right": svgBodyVerRight });
             skinBox.appendChild(svgBodyVerRight);
-
-            // FAIL
-            const svgBodyFail = createSvg({ width: l - 1, height: l - 1 });
-            svgBodyFail.setAttribute("style", `display: block;`);
-            const bodyFail = svgDraw("rect", { x: 0, y: 0, width: l, height: l, stroke: c1, fill: "deeppink" });
-            svgBodyFail.appendChild(bodyFail);
-            arena.gameEntities[ch[0]][ch[1]].skins.push({ "body_fail": svgBodyFail });
-            skinBox.appendChild(svgBodyFail);
         }
 
         app.$entityBox.appendChild(skinBox);
@@ -790,11 +833,11 @@ const gameTimer = setInterval(() => {
     // Character
     let ms = 0;
     switch (arena.charSpeed) {
-        case 1: { ms = 160; break; }
-        case 2: { ms = 90; break; }
-        case 3: { ms = 50; break; }
-        case 4: { ms = 30; break; }
-        case 5: { ms = 20; break; }
+        case 1: { ms = 240; break; }
+        case 2: { ms = 120; break; }
+        case 3: { ms = 60; break; }
+        case 4: { ms = 40; break; }
+        case 5: { ms = 30; break; }
     }
 
     if (arena.time % ms === 0) {
