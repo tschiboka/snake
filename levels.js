@@ -3,7 +3,7 @@ const levels =
         // LEVEL 1
         {
             dimension: { rows: 50, cols: 50 },
-            gameCharacterCoords: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6]],
+            gameCharacterCoords: [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9]],
             gameCharacterDirection: "down",
             objects: [
                 { type: "wallBrick", bluePrint: "1.1.V20.CCOC", colorMode: "brick" },

@@ -139,7 +139,7 @@ function handleKeypress(e) {
                 else if (arena.charDirection !== "left") arena.charDirection = "right";
                 break;
             }
-            case 32: { console.log("SPACE"); }
+            case 32: { shoot(); }
         }
         console.log(arena.charSpeed, arena.charDirection)
     }
@@ -438,23 +438,23 @@ function placeTableAndCharsOnMap() {
     if (characterAtRow > app.level.dimension.rows - 1) gameCharacterHeadCoords[0][0] = characterAtRow = app.level.dimension.rows - 1;
     if (characterAtCol > app.level.dimension.cols - 1) gameCharacterHeadCoords[0][1] = characterAtCol = app.level.dimension.cols - 1;
 
-    let displayRowsFrom = characterAtRow - tableCenRow;
-    let displayColsFrom = characterAtCol - tableCenCol;
+    arena.displayRowsFrom = characterAtRow - tableCenRow;
+    arena.displayColsFrom = characterAtCol - tableCenCol;
 
     // keep display table in range
-    if (characterAtRow - tableCenRow < 0) displayRowsFrom = 0;
-    if (characterAtCol - tableCenCol < 0) displayColsFrom = 0;
-    if (displayRowsFrom + arena.tableRowNum - app.level.dimension.rows > 0) displayRowsFrom = app.level.dimension.rows - arena.tableRowNum;
-    if (displayColsFrom + arena.tableColNum - app.level.dimension.cols > 0) displayColsFrom = app.level.dimension.cols - arena.tableColNum;
+    if (characterAtRow - tableCenRow < 0) arena.displayRowsFrom = 0;
+    if (characterAtCol - tableCenCol < 0) arena.displayColsFrom = 0;
+    if (arena.displayRowsFrom + arena.tableRowNum - app.level.dimension.rows > 0) arena.displayRowsFrom = app.level.dimension.rows - arena.tableRowNum;
+    if (arena.displayColsFrom + arena.tableColNum - app.level.dimension.cols > 0) arena.displayColsFrom = app.level.dimension.cols - arena.tableColNum;
 
     // animate background (parallax)
     const paralCoef = arena.parallaxCoefficient;
-    app.$displayTable.style.backgroundPosition = `${displayColsFrom * paralCoef * -1}px ${displayRowsFrom * paralCoef * -1}px`;
+    app.$displayTable.style.backgroundPosition = `${arena.displayColsFrom * paralCoef * -1}px ${arena.displayRowsFrom * paralCoef * -1}px`;
 
     // loop through an extra grid of rows and cols around table for clearing objects that will go out of tables range
     for (let r = -1; r <= arena.tableRowNum; r++) {
         for (let c = -1; c <= arena.tableColNum; c++) {
-            const [rowOnMap, colOnMap] = [displayRowsFrom + r, displayColsFrom + c];
+            const [rowOnMap, colOnMap] = [arena.displayRowsFrom + r, arena.displayColsFrom + c];
 
             // check if there is any entity on row col
             if (arena.gameEntities[rowOnMap] && arena.gameEntities[rowOnMap][colOnMap]) {
@@ -583,7 +583,7 @@ const getBrickColor = (n, e) => {
 function drawCharacterSkins(coords) {
     const l = app.gameTableCellLength + 1;
     const c1 = "rgb(128, 255, 217)";
-    const c2 = "rgba(128, 255, 217, 0.25)";
+    const c2 = "rgba(128, 255, 217, 0.35)";
 
     coords.forEach((ch, i, choordsArr) => {
         const skinBox = document.createElement("div");
@@ -895,4 +895,63 @@ function moveCharacter(row, col) {
     characterCoords.forEach((coords, i) => arena.gameEntities[coords[0]][coords[1]] = charObjs[i]);
 
     placeTableAndCharsOnMap();
+}
+
+
+
+function shoot() {
+    const headRC = app.level.gameCharacterCoords[0];
+    const direction = arena.charDirection;
+
+    // create bullet svg
+    const l = app.gameTableCellLength;
+    const svgBullet = createSvg({ width: l, height: l });
+    let lineBullet;
+
+    (direction === "down" || direction === "up")
+        ? lineBullet = svgDraw("line", { x1: (l + 1) / 2, x2: (l + 1) / 2, y1: (l + 1) / 3, y2: (l + 1) / 3 * 2, stroke: "deeppink", "stroke-width": 1 })
+        : lineBullet = svgDraw("line", { x1: (l + 1) / 3, x2: (l + 1) / 3 * 2, y1: (l + 1) / 2, y2: (l + 1) / 2, stroke: "deeppink", "stroke-width": 1 });
+    svgBullet.appendChild(lineBullet);
+    app.$entityBox.appendChild(svgBullet);
+
+    function displayBullet(c) {
+        switch (direction) {
+            case "down": {
+                svgBullet.setAttribute("style", `
+                 top: ${headRC[0] * l + c * l - arena.displayRowsFrom * l}px; 
+                 left: ${headRC[1] * l - arena.displayColsFrom * l}px;
+                 `);
+                break;
+            }
+            case "up": {
+                svgBullet.setAttribute("style", `
+                 top: ${headRC[0] * l - c * l - arena.displayRowsFrom * l}px; 
+                 left: ${headRC[1] * l - arena.displayColsFrom * l}px;
+                 `);
+                break;
+            }
+            case "left": {
+                svgBullet.setAttribute("style", `
+                 top: ${headRC[0] * l - arena.displayRowsFrom * l}px; 
+                 left: ${headRC[1] * l - c * l - arena.displayColsFrom * l}px;
+                 `);
+                break;
+            }
+            case "right": {
+                svgBullet.setAttribute("style", `
+                 top: ${headRC[0] * l - arena.displayRowsFrom * l}px; 
+                 left: ${headRC[1] * l + c * l - arena.displayColsFrom * l}px;
+                 `);
+                break;
+            }
+        }
+    }
+
+    displayBullet(0);
+
+    let counter = 1;
+    const shootTimer = setInterval(() => {
+        displayBullet(counter);
+        counter++;
+    }, 10);
 }
