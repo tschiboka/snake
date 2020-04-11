@@ -903,16 +903,33 @@ function shoot() {
     const headRC = app.level.gameCharacterCoords[0];
     const direction = arena.charDirection;
 
+    // don't shoot when by the edges of display table
+    if (direction === "up" && headRC[0] <= 0) return void (0);
+    if (direction === "down" && headRC[0] >= arena.displayRowsFrom + arena.tableRowNum - 1) return void (0);
+    if (direction === "left" && headRC[1] <= 0) return void (0);
+    if (direction === "right" && headRC[1] >= arena.displayColsFrom + arena.tableColNum - 1) return void (0);
+
     // create bullet svg
     const l = app.gameTableCellLength;
     const svgBullet = createSvg({ width: l, height: l });
     let lineBullet;
+    let counter = 1;
 
     (direction === "down" || direction === "up")
         ? lineBullet = svgDraw("line", { x1: (l + 1) / 2, x2: (l + 1) / 2, y1: (l + 1) / 3, y2: (l + 1) / 3 * 2, stroke: "deeppink", "stroke-width": 1 })
         : lineBullet = svgDraw("line", { x1: (l + 1) / 3, x2: (l + 1) / 3 * 2, y1: (l + 1) / 2, y2: (l + 1) / 2, stroke: "deeppink", "stroke-width": 1 });
     svgBullet.appendChild(lineBullet);
     app.$entityBox.appendChild(svgBullet);
+
+    // return true if bullet is in range
+    function removeBulletIfOutOfMapRange(c) {
+        if (headRC[0] * l + c * l - arena.displayRowsFrom * l <= headRC[0] * l //||
+            //headRC[0] * l + c * l - arena.displayRowsFrom * l >= l * arena.tableRowNum ||
+            //headRC[1] * l + c * l - arena.displayColsFrom * l <= headRC[1] * l ||
+            //headRC[1] * l + c * l - arena.displayColsFrom * l >= l * arena.tableRowNum
+        ) console.log("OUT");
+        console.log(headRC[0] * l + c * l - arena.displayRowsFrom * l, headRC[0] * l)
+    }
 
     function displayBullet(c) {
         switch (direction) {
@@ -947,11 +964,11 @@ function shoot() {
         }
     }
 
-    displayBullet(0);
+    //removeBulletIfOutOfMapRange(counter);
+    displayBullet(1);
 
-    let counter = 1;
     const shootTimer = setInterval(() => {
-        displayBullet(counter);
         counter++;
+        displayBullet(counter);
     }, 10);
 }
