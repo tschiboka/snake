@@ -871,6 +871,8 @@ function moveCharacter(row, col) {
     // check if coords occupied by another entity
     if (arena.gameEntities[headCoord[0] + row][headCoord[1] + col]) collides = true;
 
+    if (collides) return void (0);
+
     // set direction
     switch ("" + row + col) {
         case "-10": { arena.charDirection = "up"; break; }
@@ -878,7 +880,6 @@ function moveCharacter(row, col) {
         case "0-1": { arena.charDirection = "left"; break; }
         case "01": { arena.charDirection = "right"; }
     }
-    if (collides) return void (0);
 
     // copy character objs
     const charObjs = characterCoords
@@ -916,25 +917,14 @@ function shoot() {
     let lineBullet;
 
     (direction === "down" || direction === "up")
-        ? lineBullet = svgDraw("line", { x1: (l + 1) / 2, x2: (l + 1) / 2, y1: (l + 1) / 3, y2: (l + 1) / 3 * 2, stroke: "deeppink", "stroke-width": 1 })
-        : lineBullet = svgDraw("line", { x1: (l + 1) / 3, x2: (l + 1) / 3 * 2, y1: (l + 1) / 2, y2: (l + 1) / 2, stroke: "deeppink", "stroke-width": 1 });
+        ? lineBullet = svgDraw("line", { x1: (l + 1) / 2, x2: (l + 1) / 2, y1: (l + 1) / 3, y2: (l + 1) / 3 * 2, stroke: "deeppink", "stroke-width": 3 })
+        : lineBullet = svgDraw("line", { x1: (l + 1) / 3, x2: (l + 1) / 3 * 2, y1: (l + 1) / 2, y2: (l + 1) / 2, stroke: "deeppink", "stroke-width": 3 });
     svgBullet.appendChild(lineBullet);
     app.$entityBox.appendChild(svgBullet);
 
     let shootingDirection = arena.charDirection;
-    let counter = 1;
+    let counter = 0;
     arena.charIsShooting = true;
-
-    function checkIfBulletIsStillInRange(c) {
-        let inRange = true;
-        switch (shootingDirection) {
-            case "up": { if (headRC[0] - c < arena.displayRowsFrom) inRange = false; break; }
-            case "down": { if (headRC[0] + c >= arena.displayRowsFrom + arena.tableRowNum) inRange = false; break; }
-            case "left": { if (headRC[1] - c < arena.displayColsFrom) inRange = false; break; }
-            case "right": { if (headRC[1] + c >= arena.displayColsFrom + arena.tableColNum) inRange = false; break; }
-        }
-        return inRange;
-    }
 
     function displayBullet(c) {
         switch (shootingDirection) {
@@ -969,16 +959,44 @@ function shoot() {
         }
     }
 
-    function shootFunction() {
-        counter++;
-        if (checkIfBulletIsStillInRange(counter)) displayBullet(counter);
-        else {
-            app.$entityBox.removeChild(svgBullet);
-            arena.charIsShooting = false;
-            clearInterval(shootTimer);
+    function checkIfBulletIsStillInRange(c) {
+        let inRange = true;
+        switch (shootingDirection) {
+            case "up": { if (headRC[0] - c < arena.displayRowsFrom) inRange = false; break; }
+            case "down": { if (headRC[0] + c >= arena.displayRowsFrom + arena.tableRowNum) inRange = false; break; }
+            case "left": { if (headRC[1] - c < arena.displayColsFrom) inRange = false; break; }
+            case "right": { if (headRC[1] + c >= arena.displayColsFrom + arena.tableColNum) inRange = false; break; }
+        }
+        return inRange;
+    }
+
+    function checkIfBulletHits(c) {
+        let bulletRowCol = [];
+        switch (shootingDirection) {
+            case "up": { bulletRowCol = [headRC[0] - c, headRC[1]]; break; }
+            case "down": { bulletRowCol = [headRC[0] + c, headRC[1]]; break; }
+            case "left": { bulletRowCol = [headRC[0], headRC[1] - c]; break; }
+            case "right": { bulletRowCol = [headRC[0], headRC[1] + c]; break; }
+        }
+        if (arena.gameEntities[bulletRowCol[0]][bulletRowCol[1]]) {
+            removeBullet();
         }
     }
 
-    shootFunction();
+    function removeBullet() {
+        app.$entityBox.removeChild(svgBullet);
+        arena.charIsShooting = false;
+        clearInterval(shootTimer);
+    }
+
+    function shootFunction() {
+        counter++;
+        if (checkIfBulletIsStillInRange(counter)) { displayBullet(counter); checkIfBulletHits(counter) }
+        else {
+            removeBullet();
+        }
+    }
+
     const shootTimer = setInterval(() => shootFunction(), 20);
+    shootFunction();
 }
