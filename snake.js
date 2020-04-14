@@ -50,6 +50,7 @@ const arena = {
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
     charDirection: "",                                 // (str)  -> (up|down|left|right)
     charSpeed: 2,                                      // (+int) -> the time the char needs to step one (ms)
+    charIsShooting: false,                             // (flag) -> one bullet is shot a time
     time: 0,                                           // (+int) -> time that being incremented and triggers char and entitys move
     entityColors: {                                    //     predifined list of the displayable colors -
         "charHead": "transparent",                     //     defined here in order to save computations -
@@ -139,7 +140,7 @@ function handleKeypress(e) {
                 else if (arena.charDirection !== "left") arena.charDirection = "right";
                 break;
             }
-            case 32: { shoot(); }
+            case 32: { if (!arena.charIsShooting) shoot(); }
         }
         console.log(arena.charSpeed, arena.charDirection)
     }
@@ -913,7 +914,6 @@ function shoot() {
     const l = app.gameTableCellLength;
     const svgBullet = createSvg({ width: l, height: l });
     let lineBullet;
-    let counter = 1;
 
     (direction === "down" || direction === "up")
         ? lineBullet = svgDraw("line", { x1: (l + 1) / 2, x2: (l + 1) / 2, y1: (l + 1) / 3, y2: (l + 1) / 3 * 2, stroke: "deeppink", "stroke-width": 1 })
@@ -921,18 +921,23 @@ function shoot() {
     svgBullet.appendChild(lineBullet);
     app.$entityBox.appendChild(svgBullet);
 
-    // return true if bullet is in range
-    function removeBulletIfOutOfMapRange(c) {
-        if (headRC[0] * l + c * l - arena.displayRowsFrom * l <= headRC[0] * l //||
-            //headRC[0] * l + c * l - arena.displayRowsFrom * l >= l * arena.tableRowNum ||
-            //headRC[1] * l + c * l - arena.displayColsFrom * l <= headRC[1] * l ||
-            //headRC[1] * l + c * l - arena.displayColsFrom * l >= l * arena.tableRowNum
-        ) console.log("OUT");
-        console.log(headRC[0] * l + c * l - arena.displayRowsFrom * l, headRC[0] * l)
+    let shootingDirection = arena.charDirection;
+    let counter = 1;
+    arena.charIsShooting = true;
+
+    function checkIfBulletIsStillInRange(c) {
+        let inRange = true;
+        switch (shootingDirection) {
+            case "up": { if (headRC[0] - c < arena.displayRowsFrom) inRange = false; break; }
+            case "down": { if (headRC[0] + c >= arena.displayRowsFrom + arena.tableRowNum) inRange = false; break; }
+            case "left": { if (headRC[1] - c < arena.displayColsFrom) inRange = false; break; }
+            case "right": { if (headRC[1] + c >= arena.displayColsFrom + arena.tableColNum) inRange = false; break; }
+        }
+        return inRange;
     }
 
     function displayBullet(c) {
-        switch (direction) {
+        switch (shootingDirection) {
             case "down": {
                 svgBullet.setAttribute("style", `
                  top: ${headRC[0] * l + c * l - arena.displayRowsFrom * l}px; 
@@ -964,11 +969,16 @@ function shoot() {
         }
     }
 
-    //removeBulletIfOutOfMapRange(counter);
-    displayBullet(1);
-
-    const shootTimer = setInterval(() => {
+    function shootFunction() {
         counter++;
-        displayBullet(counter);
-    }, 10);
+        if (checkIfBulletIsStillInRange(counter)) displayBullet(counter);
+        else {
+            app.$entityBox.removeChild(svgBullet);
+            arena.charIsShooting = false;
+            clearInterval(shootTimer);
+        }
+    }
+
+    shootFunction();
+    const shootTimer = setInterval(() => shootFunction(), 20);
 }
