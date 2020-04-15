@@ -277,7 +277,12 @@ function buildGameArenaEntitiesObject(obj) {
                         drawMethod: "static"  // by every redraw it looks the same
                     };
                 }); // end of msp coord
+                break;
             } // end of case wallBrick
+            case "coin": {
+                console.log(o);
+                entities[o.row][o.col] = { type: o.type, drawMethod: "static" };
+            }
         } // end of switch game entity object type
     });
     return entities;
@@ -491,7 +496,8 @@ function drawAllEntitiesOnGameBox() {
     arena.gameEntities.forEach((row, r) => row.map((col, c) => {
         if (!col) return;
         switch (col.type) {
-            case "wallBrick": { drawSingleWallBlock(arena.gameEntities[r][c], r, c); break; }
+            case "wallBrick": { drawWall(arena.gameEntities[r][c], r, c); break; }
+            case "coin": { drawCoin(r, c); break; }
         }
     }));
 }
@@ -755,7 +761,7 @@ function drawCharacterSkins(coords) {
 
 
 
-function drawSingleWallBlock(entity, row, col) {
+function drawWall(entity, row, col) {
     const model = entity.model;
     const l = app.gameTableCellLength + 1;
     const svg = createSvg({ width: l, height: l });
@@ -814,6 +820,35 @@ function drawSingleWallBlock(entity, row, col) {
     }
 
     const ind = row * app.level.dimension.rows + col;
+    svg.id = `entity_${ind}`;
+    arena.gameEntities[row][col].id = ind;
+    svg.setAttribute("style", `display: none;`);
+    app[`$entity_${ind}`] = svg;
+    app.$entityBox.appendChild(svg);
+}
+
+
+
+function drawCoin(row, col) {
+    const ind = row * app.level.dimension.rows + col;
+    const l = app.gameTableCellLength + 1;
+    const svg = createSvg({ width: l, height: l });
+    const c1 = "#fcbe52";
+    const c2 = "#f9fe9c";
+    const x = l / 3 + (2 * (l / 9));
+
+    const cir1 = svgDraw("circle", { cx: l / 2, cy: l / 2, r: l / 3, stroke: c1, fill: c2, "stroke-width": l / 10 });
+    const pathStr = `M ${l / 3} ${l - l / 3} h ${l / 3} 
+    l ${l / 9} -${l / 4}
+    l -${x / 4} ${l / 8}
+    l -${x / 4} -${l / 8}
+    l -${x / 4} ${l / 8}
+    l -${x / 4} -${l / 8} z`;
+    const path = svgDraw("path", { d: pathStr, stroke: c1, fill: "rgba(0, 0, 0, 0.2)", "stroke-width": l / 10 });
+
+    svg.appendChild(cir1);
+    svg.appendChild(path);
+
     svg.id = `entity_${ind}`;
     arena.gameEntities[row][col].id = ind;
     svg.setAttribute("style", `display: none;`);
