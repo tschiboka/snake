@@ -25,6 +25,11 @@ const app = {
     $displayTable: undefined,                          // game board that holds character and all game entities (created later)
 
     // APP VARS
+    levelPoints: {                                     // (obj)  -> points made of different actions
+        coins: 0,                                      //        -> coins collected
+        kills: 0,                                      //        -> enemies killed
+    },
+    totalPoints: [],                                   // (arr)  -> sum of levelPoints objs
     introDuration: 1,                                  // (+int) -> the intro animation in secs
     loadLevelsState: "pending",                        // ("pending" | "success" | "error") -> if level JSON is loaded
     currentLevel: 1,                                   // (+int) -> default 1 unless local store has level stored
@@ -236,6 +241,7 @@ function buildGameArenaEntitiesObject(obj) {
             type: (i === 0 ? "charHead" : i === app.level.gameCharacterCoords.length - 1 ? "charTail" : "charBody"),
             drawMethod: "dinamic", // char can look differently by every redraw
             skins: [], // the possible skins
+            blocking: { char: true, bullet: true }, // if objects is interacting with characters or bullets
             index: i
         }
     });
@@ -274,6 +280,7 @@ function buildGameArenaEntitiesObject(obj) {
                         model: modifiedModel || model,
                         colorSequence: createSequence(),
                         colorMode: o.colorMode || "brick",
+                        blocking: { char: true, bullet: true }, // if objects is interacting with characters or bullets
                         drawMethod: "static"  // by every redraw it looks the same
                     };
                 }); // end of msp coord
@@ -281,7 +288,11 @@ function buildGameArenaEntitiesObject(obj) {
             } // end of case wallBrick
             case "coin": {
                 console.log(o);
-                entities[o.row][o.col] = { type: o.type, drawMethod: "static" };
+                entities[o.row][o.col] = {
+                    type: o.type,
+                    drawMethod: "static",
+                    blocking: { char: false, bullet: false },
+                };
             }
         } // end of switch game entity object type
     });
@@ -468,13 +479,18 @@ function placeTableAndCharsOnMap() {
 
                 // clear even if row or col is out of range
                 if (arena.gameEntities[rowOnMap][colOnMap].drawMethod === "static") {
-                    app["$entity_" + id].setAttribute("style", `display: none;`);
+                    if (arena.gameEntities[rowOnMap][colOnMap].type === "coin") console.log("COIN");
+                    app["$entity_" + id].setAttribute("style", `display: none !important;`);
                 } else { [...app["$entity_" + id].children].forEach(svg => svg.style.display = "none"); }
 
                 // repaint the ones in range
                 if (r >= 0 && c >= 0 && r < arena.tableRowNum && c < arena.tableColNum) {
                     if (arena.gameEntities[rowOnMap][colOnMap].drawMethod === "static") {
-                        const newStyle = `top: ${r * app.gameTableCellLength}px; left: ${c * app.gameTableCellLength}px; display: block;`;
+                        const newStyle = `
+                            top: ${r * app.gameTableCellLength}px;
+                            left: ${c * app.gameTableCellLength}px;
+                            display: block;
+                        `;
                         app["$entity_" + id].setAttribute("style", newStyle);
                     } // if static
                     else {
@@ -850,6 +866,9 @@ function drawCoin(row, col) {
     svg.appendChild(path);
 
     svg.id = `entity_${ind}`;
+    console.log(Math.floor(Math.random() * 4));
+    svg.classList.add("coin");
+    svg.classList.add(`coin-delay${Math.floor(Math.random() * 4)}`);
     arena.gameEntities[row][col].id = ind;
     svg.setAttribute("style", `display: none;`);
     app[`$entity_${ind}`] = svg;
@@ -903,8 +922,16 @@ function moveCharacter(row, col) {
     if (headCoord[0] + row > app.level.dimension.rows - 1 || headCoord[1] + col > app.level.dimension.cols - 1) outOfRange = true;
     if (outOfRange) return void (0);
 
-    // check if coords occupied by another entity
-    if (arena.gameEntities[headCoord[0] + row][headCoord[1] + col]) collides = true;
+    // check if coords occupied by another blocking entity
+    const mapCell = arena.gameEntities[headCoord[0] + row][headCoord[1] + col];
+    if (mapCell) {
+        if (mapCell.blocking.char) collides = true;
+        else {
+            switch (mapCell.type) {
+                case "coin": { collectCoin(mapCell); break; }
+            }
+        }
+    }
 
     if (collides) return void (0);
 
@@ -1034,4 +1061,11 @@ function shoot() {
 
     const shootTimer = setInterval(() => shootFunction(), 20);
     shootFunction();
+}
+
+
+
+function collectCoin(entity) {
+
+    console.log("COLLECT", entity);
 }

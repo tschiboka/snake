@@ -61,6 +61,7 @@ body {
 .game__stats {
     order: 1;
     border-bottom: 1px solid #ddd;
+    color: #ddd;
 }
 
 .game__box {
@@ -116,6 +117,15 @@ body {
     position: absolute;
 }
 
+.coin {
+    animation: coin-anim 1s linear infinite;
+}
+
+.coin-delay0 { animation-delay: 0s;}
+.coin-delay1 { animation-delay: 0.2s;}
+.coin-delay2 { animation-delay: 0.4s;}
+.coin-delay3 { animation-delay: 0.6s;}
+
 @keyframes intro {
     from { opacity: 1; }
     to { opacity: 0; }
@@ -124,4 +134,12 @@ body {
 @-webkit-keyframes intro {
     from { opacity: 1; }
     to { opacity: 0; }
+}
+
+@keyframes coin-anim {
+    0% { transform: translateY(-1px); }
+    25% { transform: translateY(0); }
+    50% { transform: translateY(1px); }
+    75% { transform: translateY(0); }
+    100% { transform: translateY(-1px); }
 }
