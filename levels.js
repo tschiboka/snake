@@ -3,7 +3,7 @@ const levels =
         // LEVEL 1
         {
             dimension: { rows: 21, cols: 150 },
-            gameCharacterCoords: [[11, 7], [11, 6], [11, 5], [11, 4], [11, 3], [11, 2], [11, 1], [11, 0]],
+            gameCharacterCoords: [[7, 7], [7, 6], [7, 5], [7, 4], [7, 3], [7, 2], [7, 1], [7, 0]],
             gameCharacterDirection: "right",
             objects: [
                 { type: "wallBrick", bluePrint: "10.0.H8.COCO", colorMode: "brick" },
@@ -19,7 +19,7 @@ const levels =
                 { type: "coin", row: 14, col: 7 },
                 { type: "coin", row: 15, col: 7 },
                 { type: "coin", row: 16, col: 7 },
-                { type: "coin", row: 17, col: 7 },
+                { type: "coin", row: 7, col: 8 },
             ],
         }
     ]

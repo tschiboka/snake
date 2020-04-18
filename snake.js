@@ -19,6 +19,12 @@ const app = {
     $intro: $(".intro"),                               // intros wrapping div
     $mainMenu: $(".main-menu"),                        // main menu
     $game: $(".game"),                                 // games div (stats, game, ?constrol for mobile)
+    $levelDisplay: $("#game__stats__level"),           // stats level display
+    $pointDisplay: $("#game__stats__points"),          // stats points display
+    $lifeDisplay: $("#game__stats__life"),             // stats life display
+    $speedDisplay: $("#game__stats__speed"),           // stats speed display
+    $directionDisplay: $("#game__stats__direction"),   // stats direction display
+    $bulletsDisplay: $("#game__stats__bullets"),       // stats direction bullets
     $control: $(".game__control"),                     // holds control btns (eg for mobile game-play)
     $gameBox: $(".game__box"),                         // holds display table and entity obj divs 
     $entityBox: undefined,                             // holds every game characters', objects' divs (created later)
@@ -55,14 +61,9 @@ const arena = {
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
     charDirection: "",                                 // (str)  -> (up|down|left|right)
     charSpeed: 2,                                      // (+int) -> the time the char needs to step one (ms)
+    charLife: 100,                                     // (+int) -> life is expressed in percentage (0% death)
     charIsShooting: false,                             // (flag) -> one bullet is shot a time
     time: 0,                                           // (+int) -> time that being incremented and triggers char and entitys move
-    entityColors: {                                    //     predifined list of the displayable colors -
-        "charHead": "transparent",                     //     defined here in order to save computations -
-        "charBody": "transparent",                     //     in 2d arr loop of displaying the table (can be > 1000s)
-        "crosshair": "rgba(255, 255, 255, 0.03)",
-        "wallBrick": "transparent",
-    },
     brickColorSequence: {
         brick: [                                       // (obj of arr of str)  -> colors of random individual brick colors
             "#b3a432", "#9c8128", "#ab752b", "#d9a662", "#d99062",
@@ -475,17 +476,17 @@ function placeTableAndCharsOnMap() {
 
             // check if there is any entity on row col
             if (arena.gameEntities[rowOnMap] && arena.gameEntities[rowOnMap][colOnMap]) {
-                const id = arena.gameEntities[rowOnMap][colOnMap].id;
+                const entity = arena.gameEntities[rowOnMap][colOnMap];
+                const id = entity.id;
 
                 // clear even if row or col is out of range
-                if (arena.gameEntities[rowOnMap][colOnMap].drawMethod === "static") {
-                    if (arena.gameEntities[rowOnMap][colOnMap].type === "coin") console.log("COIN");
-                    app["$entity_" + id].setAttribute("style", `display: none !important;`);
+                if (entity.drawMethod === "static") {
+                    app["$entity_" + id].setAttribute("style", `display: none;`);
                 } else { [...app["$entity_" + id].children].forEach(svg => svg.style.display = "none"); }
 
                 // repaint the ones in range
                 if (r >= 0 && c >= 0 && r < arena.tableRowNum && c < arena.tableColNum) {
-                    if (arena.gameEntities[rowOnMap][colOnMap].drawMethod === "static") {
+                    if (entity.drawMethod === "static") {
                         const newStyle = `
                             top: ${r * app.gameTableCellLength}px;
                             left: ${c * app.gameTableCellLength}px;
@@ -494,12 +495,13 @@ function placeTableAndCharsOnMap() {
                         app["$entity_" + id].setAttribute("style", newStyle);
                     } // if static
                     else {
-                        displayCaracterAndNPCs(arena.gameEntities[rowOnMap][colOnMap], id, r, c);
+                        displayCaracterAndNPCs(entity, id, r, c);
                     } // if dinamic
                 } // if in range
             } // if entity 
         } // for col
     } // for row
+
 
     t1 = performance.now();
     app.performanceAvg.push(t1 - t0)
@@ -866,7 +868,6 @@ function drawCoin(row, col) {
     svg.appendChild(path);
 
     svg.id = `entity_${ind}`;
-    console.log(Math.floor(Math.random() * 4));
     svg.classList.add("coin");
     svg.classList.add(`coin-delay${Math.floor(Math.random() * 4)}`);
     arena.gameEntities[row][col].id = ind;
@@ -928,7 +929,7 @@ function moveCharacter(row, col) {
         if (mapCell.blocking.char) collides = true;
         else {
             switch (mapCell.type) {
-                case "coin": { collectCoin(mapCell); break; }
+                case "coin": { collectCoin(mapCell, headCoord[0] + row, headCoord[1] + col); break; }
             }
         }
     }
@@ -1065,7 +1066,17 @@ function shoot() {
 
 
 
-function collectCoin(entity) {
+function collectCoin(entity, row, col) {
+    arena.gameEntities[row][col] = undefined;
+    console.log("COLLECT", arena.gameEntities[row][col]);
+    placeTableAndCharsOnMap();
+    app[`$entity_${entity.id}`].style.display = "none";
+    app.levelPoints.coins++;
+    upDateStats();
+}
 
-    console.log("COLLECT", entity);
+
+function upDateStats() {
+    app.$levelDisplay.innerHTML = app.level;
+    app.$pointDisplay.innerHTML = app.levelPoints.coins * 10; // changes!!!!!!!!!!!!
 }

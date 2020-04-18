@@ -117,7 +117,7 @@ body {
     position: absolute;
 }
 
-.coin {
+/*.coin {
     animation: coin-anim 1s linear infinite;
 }
 
@@ -125,7 +125,7 @@ body {
 .coin-delay1 { animation-delay: 0.2s;}
 .coin-delay2 { animation-delay: 0.4s;}
 .coin-delay3 { animation-delay: 0.6s;}
-
+*/
 @keyframes intro {
     from { opacity: 1; }
     to { opacity: 0; }
