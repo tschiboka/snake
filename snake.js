@@ -35,7 +35,7 @@ const app = {
         coins: 0,                                      //        -> coins collected
         kills: 0,                                      //        -> enemies killed
     },
-    totalPoints: [],                                   // (arr)  -> sum of levelPoints objs
+    totalPoints: [],                                   // (arr)  -> sum of levelPoints objs (from localStorage if any)
     introDuration: 1,                                  // (+int) -> the intro animation in secs
     loadLevelsState: "pending",                        // ("pending" | "success" | "error") -> if level JSON is loaded
     currentLevel: 1,                                   // (+int) -> default 1 unless local store has level stored
@@ -62,6 +62,7 @@ const arena = {
     charDirection: "",                                 // (str)  -> (up|down|left|right)
     charSpeed: 2,                                      // (+int) -> the time the char needs to step one (ms)
     charLife: 100,                                     // (+int) -> life is expressed in percentage (0% death)
+    charBullets: 0,                                    // (+int) -> bullets loads from localStorage
     charIsShooting: false,                             // (flag) -> one bullet is shot a time
     time: 0,                                           // (+int) -> time that being incremented and triggers char and entitys move
     brickColorSequence: {
@@ -148,7 +149,7 @@ function handleKeypress(e) {
             }
             case 32: { if (!arena.charIsShooting) shoot(); }
         }
-        console.log(arena.charSpeed, arena.charDirection)
+        upDateStats();
     }
 }
 
@@ -179,6 +180,7 @@ function setLevelNumFromLocalStorage() {
     const storageLvl = localStorage.snake_level;
     if (!storageLvl) localStorage.setItem("snake_level", "1");
     else app.currentLevel = Number(localStorage.snake_level);
+    upDateStats("level");
 }
 
 
@@ -204,6 +206,11 @@ function startLevel() {
 
     // assign current level to app obj
     app.level = app.levels[app.currentLevel - 1];
+
+    arena.charBullets = 20;
+    arena.charLife = 100;
+    arena.charDirection = app.levels[app.currentLevel - 1].gameCharacterDirection;
+    upDateStats();
 
     buildGameTableArea();
 }
@@ -965,6 +972,8 @@ function moveCharacter(row, col) {
 
 
 function shoot() {
+    if (arena.charBullets <= 0) return void (0);
+
     const headRC = app.level.gameCharacterCoords[0];
     const direction = arena.charDirection;
 
@@ -973,6 +982,9 @@ function shoot() {
     if (direction === "down" && headRC[0] >= arena.displayRowsFrom + arena.tableRowNum - 1) return void (0);
     if (direction === "left" && headRC[1] <= 0) return void (0);
     if (direction === "right" && headRC[1] >= arena.displayColsFrom + arena.tableColNum - 1) return void (0);
+
+    arena.charBullets--;
+    upDateStats("bullets");
 
     // create bullet svg
     const l = app.gameTableCellLength;
@@ -1068,15 +1080,20 @@ function shoot() {
 
 function collectCoin(entity, row, col) {
     arena.gameEntities[row][col] = undefined;
-    console.log("COLLECT", arena.gameEntities[row][col]);
     placeTableAndCharsOnMap();
     app[`$entity_${entity.id}`].style.display = "none";
     app.levelPoints.coins++;
-    upDateStats();
+    upDateStats("points");
 }
 
 
-function upDateStats() {
-    app.$levelDisplay.innerHTML = app.level;
-    app.$pointDisplay.innerHTML = app.levelPoints.coins * 10; // changes!!!!!!!!!!!!
+
+function upDateStats(whatToUpdate) {
+    // if what to update is not specified update all
+    if (whatToUpdate === "level" || !whatToUpdate) app.$levelDisplay.innerHTML = app.currentLevel;
+    if (whatToUpdate === "points" || !whatToUpdate) app.$pointDisplay.innerHTML = app.levelPoints.coins * 10; // changes!!!!!!!!!!!!
+    if (whatToUpdate === "life" || !whatToUpdate) app.$lifeDisplay.innerHTML = arena.charLife;
+    if (whatToUpdate === "bullets" || !whatToUpdate) app.$bulletsDisplay.innerHTML = arena.charBullets;
+    if (whatToUpdate === "direction" || !whatToUpdate) app.$directionDisplay.innerHTML = arena.charDirection;
+    if (whatToUpdate === "speed" || !whatToUpdate) app.$speedDisplay.innerHTML = arena.charSpeed;
 }

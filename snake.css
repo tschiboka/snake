@@ -59,9 +59,20 @@ body {
 }
 
 .game__stats {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
     order: 1;
     border-bottom: 1px solid #ddd;
     color: #ddd;
+}
+
+.game__stats > div {
+    height: 50%;
+    width: 33%;
+    display: flex;
+    justify-content: center;
+    align-items: center; 
 }
 
 .game__box {
