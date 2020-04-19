@@ -59,6 +59,7 @@ const arena = {
     gameEntities: undefined,                           // (arr of arr objs) -> row col of objects that appears on the game map
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
+    collectedCoins: undefined,                         // (arr)  -> row and col of collected coins (resize redraw would put coins back)
     charDirection: "",                                 // (str)  -> (up|down|left|right)
     charSpeed: 2,                                      // (+int) -> the time the char needs to step one (ms)
     charLife: 100,                                     // (+int) -> life is expressed in percentage (0% death)
@@ -209,6 +210,7 @@ function startLevel() {
 
     arena.charBullets = 20;
     arena.charLife = 100;
+    arena.collectedCoins = []; // empty collected coins so they all can be redrawn
     arena.charDirection = app.levels[app.currentLevel - 1].gameCharacterDirection;
     upDateStats();
 
@@ -321,12 +323,15 @@ function buildGameArenaEntitiesObject(obj) {
                 break;
             } // end of case wallBrick
             case "coin": {
-                if (checkCellIsInRangeAndUnoccupied(o, o.row, o.col, o.type)) {
-                    entities[o.row][o.col] = {
-                        type: o.type,
-                        drawMethod: "static",
-                        blocking: { char: false, bullet: false },
-                    };
+                // if coin was already collected, don't redraw them
+                if (!arena.collectedCoins.find(coinRC => coinRC[0] === o.row && coinRC[1] === o.col)) {
+                    if (checkCellIsInRangeAndUnoccupied(o, o.row, o.col, o.type)) {
+                        entities[o.row][o.col] = {
+                            type: o.type,
+                            drawMethod: "static",
+                            blocking: { char: false, bullet: false },
+                        };
+                    }
                 }
                 break;
             } // end of case coin
@@ -1171,6 +1176,8 @@ function shoot() {
 
 
 function collectCoin(entity, row, col) {
+    arena.collectedCoins.push([row, col]);
+    console.log(arena.collectedCoins);
     arena.gameEntities[row][col] = undefined;
     placeTableAndCharsOnMap();
     app[`$entity_${entity.id}`].style.display = "none";
