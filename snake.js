@@ -217,9 +217,36 @@ function startLevel() {
 
 
 
+// Function builds a 2D array (app.gameEntities[row][col]) from app.level with objects
+// representing the games characters, npcs and the environment.
 function buildGameArenaEntitiesObject(obj) {
     // create an emtpty 2D array
     const entities = Array(app.level.dimension.rows).fill().map(() => Array(app.level.dimension.cols).fill(undefined));
+
+
+    function checkCellIsInRangeAndUnoccupied(obj, row, col, name) {
+        const msg = `Error while building a ${name} into gameEtities obj! `;
+        const objStr = JSON.stringify(obj);
+        const [maxRow, maxCol] = [app.level.dimension.rows - 1, app.level.dimension.cols - 1];
+
+        if (row < 0) throw new Error(`${msg}\nRow can not be smaller than 0!\n${objStr}`);
+        if (col < 0) throw new Error(`${msg}\nColumn can not be smaller than 0!\n${objStr}`);
+        if (row > maxRow) throw new Error(`${msg}
+            \nRow can not be greater than the game tables dimension (${maxRow} x ${maxCol})!
+            \nMax is ${maxRow - 1}
+            \n${objStr}`);
+
+        if (col > maxCol) throw new Error(`${msg}
+            \nColumn can not be greater than the game tables dimension (${maxCol} x ${maxCol})!
+            \nMax is ${maxCol - 1}
+            \n${objStr}`);
+
+        if (entities[row][col]) throw new Error(`${msg}
+            \nCould not assign ${objStr} to cell (row:${row}, column${col}), because it was occupied by
+            \n${JSON.stringify(entities[row][col])}`);
+
+        return true;
+    }
 
 
     // check if game character has all properties set properly and build them into game entities
@@ -291,16 +318,30 @@ function buildGameArenaEntitiesObject(obj) {
                         blocking: { char: true, bullet: true }, // if objects is interacting with characters or bullets
                         drawMethod: "static"  // by every redraw it looks the same
                     };
-                }); // end of msp coord
+                }); // end of map coord
                 break;
             } // end of case wallBrick
             case "coin": {
-                console.log(o);
-                entities[o.row][o.col] = {
-                    type: o.type,
-                    drawMethod: "static",
-                    blocking: { char: false, bullet: false },
-                };
+                if (entities[o.row][o.col]) throw new Error(JSON.stringify(o) + "\nCoin: the cell is occupied by:\n" + JSON.stringify(entities[o.row][o.col]));
+                else {
+                    entities[o.row][o.col] = {
+                        type: o.type,
+                        drawMethod: "static",
+                        blocking: { char: false, bullet: false },
+                    };
+                }
+                break;
+            } // end of case coin
+            case "electro": {
+                if (checkCellIsInRangeAndUnoccupied(o, o.row, o.col, o.type)) {
+                    entities[o.row][o.col] = {
+                        type: o.type,
+                        drawMethod: "static",
+                        blocking: { char: false, bullet: false },
+                        direction: o.direction
+                    };
+                }
+                break;
             }
         } // end of switch game entity object type
     });
@@ -523,6 +564,7 @@ function drawAllEntitiesOnGameBox() {
         switch (col.type) {
             case "wallBrick": { drawWall(arena.gameEntities[r][c], r, c); break; }
             case "coin": { drawCoin(r, c); break; }
+            case "electro": { drawElectricWall(arena.gameEntities[r][c], r, c); break; }
         }
     }));
 }
@@ -885,6 +927,26 @@ function drawCoin(row, col) {
 
 
 
+function drawElectricWall(entity, row, col) {
+    console.log(entity, row, col);
+    const ind = row * app.level.dimension.rows + col;
+    const l = app.gameTableCellLength + 1;
+    const svg = createSvg({ width: l, height: l });
+    const c1 = "#fcbe52";
+    const c2 = "#f9fe9c";
+
+    rect = svgDraw("rect", { x: 0, y: 0, width: l, height: l, fill: c1 });
+    svg.appendChild(rect);
+
+    svg.id = `entity_${ind}`;
+    arena.gameEntities[row][col].id = ind;
+    svg.setAttribute("style", `display: none;`);
+    app[`$entity_${ind}`] = svg;
+    app.$entityBox.appendChild(svg);
+}
+
+
+
 /*##################################################################################################
   #####################################  GAMEPLAY FUNCTIONS  #######################################
   ##################################################################################################*/
@@ -1093,7 +1155,13 @@ function upDateStats(whatToUpdate) {
     if (whatToUpdate === "level" || !whatToUpdate) app.$levelDisplay.innerHTML = app.currentLevel;
     if (whatToUpdate === "points" || !whatToUpdate) app.$pointDisplay.innerHTML = app.levelPoints.coins * 10; // changes!!!!!!!!!!!!
     if (whatToUpdate === "life" || !whatToUpdate) app.$lifeDisplay.innerHTML = arena.charLife;
-    if (whatToUpdate === "bullets" || !whatToUpdate) app.$bulletsDisplay.innerHTML = arena.charBullets;
+    if (whatToUpdate === "bullets" || !whatToUpdate) {
+        app.$bulletsDisplay.innerHTML = arena.charBullets;
+        if (arena.charBullets <= 10) app.$bulletsDisplay.style.color = "yellow";
+        else if (arena.charBullets <= 5) app.$bulletsDisplay.style.color = "red";
+        else app.$bulletsDisplay.style.color = "";
+        console.log(app.$bulletsDisplay.style.color)
+    }
     if (whatToUpdate === "direction" || !whatToUpdate) app.$directionDisplay.innerHTML = arena.charDirection;
     if (whatToUpdate === "speed" || !whatToUpdate) app.$speedDisplay.innerHTML = arena.charSpeed;
 }

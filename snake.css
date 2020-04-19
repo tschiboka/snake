@@ -1,3 +1,8 @@
+@font-face {
+    src: url("/fonts/SFDigitalReadout-Medium.ttf");
+    font-family: "Digital";
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -64,7 +69,10 @@ body {
     flex-wrap: wrap;
     order: 1;
     border-bottom: 1px solid #ddd;
-    color: #ddd;
+    background-color: rgba(0, 0, 0, 0.2);
+    color: rgb(146, 233, 240);
+    font-family: "Digital", monospace;
+    font-size: 1.3em;
 }
 
 .game__stats > div {
