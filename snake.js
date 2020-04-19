@@ -292,38 +292,36 @@ function buildGameArenaEntitiesObject(obj) {
 
                 coords.map((coord, i, idsArr) => {
                     modifiedModel = { ...model };
-                    // check if no entity is on row, col
-                    if (entities[coord[0]][coord[1]]) throw new Error(`Wall Error: Tried to place wall ${o.bluePrint} on occupied area! ${JSON.stringify(entities[coord[0]][coord[1]])}`);
+                    if (checkCellIsInRangeAndUnoccupied(model, ...coord, "wall")) {
+                        // modify longer walls closures to not to close within the wall bricks
+                        if (idsArr.length > 1) {
+                            if (model.direction === "horizontal") {
+                                if (i === 0) modifiedModel.closure = [model.closure[0], 0, model.closure[2], model.closure[3]];
+                                else if (i === idsArr.length - 1) modifiedModel.closure = [model.closure[0], model.closure[1], model.closure[2], 0];
+                                else modifiedModel.closure = modifiedModel.closure = [model.closure[0], 0, model.closure[2], 0];
+                            } // end of direction horizontal
 
-                    // modify longer walls closures to not to close within the wall bricks
-                    if (idsArr.length > 1) {
-                        if (model.direction === "horizontal") {
-                            if (i === 0) modifiedModel.closure = [model.closure[0], 0, model.closure[2], model.closure[3]];
-                            else if (i === idsArr.length - 1) modifiedModel.closure = [model.closure[0], model.closure[1], model.closure[2], 0];
-                            else modifiedModel.closure = modifiedModel.closure = [model.closure[0], 0, model.closure[2], 0];
-                        }
+                            if (model.direction === "vertical") {
+                                if (i === 0) modifiedModel.closure = [model.closure[0], model.closure[1], 0, model.closure[3]];
+                                else if (i === idsArr.length - 1) modifiedModel.closure = [0, model.closure[1], model.closure[2], model.closure[3]];
+                                else modifiedModel.closure = [0, model.closure[1], 0, model.closure[3]];
+                            } // end of direction vertical
+                        } // end of if ids array length is greater then one
 
-                        if (model.direction === "vertical") {
-                            if (i === 0) modifiedModel.closure = [model.closure[0], model.closure[1], 0, model.closure[3]];
-                            else if (i === idsArr.length - 1) modifiedModel.closure = [0, model.closure[1], model.closure[2], model.closure[3]];
-                            else modifiedModel.closure = [0, model.closure[1], 0, model.closure[3]];
-                        }
-                    }
-
-                    entities[coord[0]][coord[1]] = {
-                        type: o.type,
-                        model: modifiedModel || model,
-                        colorSequence: createSequence(),
-                        colorMode: o.colorMode || "brick",
-                        blocking: { char: true, bullet: true }, // if objects is interacting with characters or bullets
-                        drawMethod: "static"  // by every redraw it looks the same
-                    };
+                        entities[coord[0]][coord[1]] = {
+                            type: o.type,
+                            model: modifiedModel || model,
+                            colorSequence: createSequence(),
+                            colorMode: o.colorMode || "brick",
+                            blocking: { char: true, bullet: true }, // if objects is interacting with characters or bullets
+                            drawMethod: "static"  // by every redraw it looks the same
+                        }; // end of wall entity object
+                    } // end of if cell is in range and unoccupied
                 }); // end of map coord
                 break;
             } // end of case wallBrick
             case "coin": {
-                if (entities[o.row][o.col]) throw new Error(JSON.stringify(o) + "\nCoin: the cell is occupied by:\n" + JSON.stringify(entities[o.row][o.col]));
-                else {
+                if (checkCellIsInRangeAndUnoccupied(o, o.row, o.col, o.type)) {
                     entities[o.row][o.col] = {
                         type: o.type,
                         drawMethod: "static",
@@ -334,10 +332,18 @@ function buildGameArenaEntitiesObject(obj) {
             } // end of case coin
             case "electro": {
                 if (checkCellIsInRangeAndUnoccupied(o, o.row, o.col, o.type)) {
+                    if (o.direction !== "up" && o.direction !== "down" && o.direction !== "left" && o.direction !== "right") throw new Error(`Error while building electric wall:\n${JSON.stringify(o)} direction is invalid! (${o.direction})`);
+                    if (!Array.isArray(o.openCloseInterval) || o.openCloseInterval.length < 2 || o.openCloseInterval.length % 2 !== 0) throw new Error(`
+                    Error while building electric wall!
+                    \n openCloseInterval must be provided, it must be an array, of length min 2, length must be even number!
+                    \n ${o.openCloseInterval}\nat\n${JSON.stringify(o)}`);
+
                     entities[o.row][o.col] = {
                         type: o.type,
+                        direction: o.direction,
+                        openCloseInterval: o.openCloseInterval,
                         drawMethod: "static",
-                        blocking: { char: false, bullet: false },
+                        blocking: { char: true, bullet: false },
                         direction: o.direction
                     };
                 }

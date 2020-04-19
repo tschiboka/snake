@@ -23,10 +23,10 @@ const levels =
                 { type: "coin", row: 15, col: 7 },
                 { type: "coin", row: 16, col: 7 },
                 { type: "coin", row: 17, col: 7 },
-                { type: "electro", row: 0, col: 0, direction: "HL" },
+                { type: "electro", row: 0, col: 0, direction: "right", openCloseInterval: [1, 2.5] },
             ],
             npcs: [
-                { type: "bug", row: 17, col: 3, openingInterval: [1, 2.5] }, // not ready yet
+                { type: "bug", row: 17, col: 3 }, // not ready yet
             ]
         },
         // LEVEL 2
