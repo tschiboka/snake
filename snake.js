@@ -937,12 +937,36 @@ function drawElectricWall(entity, row, col) {
     console.log(entity, row, col);
     const ind = row * app.level.dimension.rows + col;
     const l = app.gameTableCellLength + 1;
-    const svg = createSvg({ width: l, height: l });
-    const c1 = "#fcbe52";
-    const c2 = "#f9fe9c";
+    const w = entity.direction === "right" || entity.direction === "left" ? l * 2 : l;
+    const h = entity.direction === "up" || entity.direction === "down" ? l * 2 : l;
+    const svg = createSvg({ width: w, height: h });
+    const c1 = "rgba(255, 255, 255, 0.85)";
+    const c2 = "rgba(255, 255, 255, 0.35)";
 
-    rect = svgDraw("rect", { x: 0, y: 0, width: l, height: l, fill: c1 });
+    rect = svgDraw("rect", { x: 1, y: 1, width: l - 2, height: l - 2, stroke: c1, "stroke-width": 2, fill: "transparent" });
     svg.appendChild(rect);
+    const line1 = svgDraw("line", { x1: 2, x2: l / 5 + (l / 5) / 2, y1: l / 5 + (l / 5) / 2, y2: 2, stroke: c2 });
+    svg.appendChild(line1);
+    const line2 = svgDraw("line", { x1: 2, x2: (l / 5 + (l / 5) / 2) * 2, y1: (l / 5 + (l / 5) / 2) * 2, y2: 2, stroke: c2 });
+    svg.appendChild(line2);
+    const line3 = svgDraw("line", { x1: 2, x2: (l / 5 + (l / 5) / 2) * 3, y1: (l / 5 + (l / 5) / 2) * 3, y2: 2, stroke: c2 });
+    svg.appendChild(line3);
+    const line4 = svgDraw("line", { x1: l / 5 + (l / 5) / 2 + 2, x2: (l / 5 + (l / 5) / 2) * 3, y1: (l / 5 + (l / 5) / 2) * 3, y2: l / 5 + (l / 5) / 2 + 2, stroke: c2 });
+    svg.appendChild(line4);
+    const line5 = svgDraw("line", { x1: (l / 5 + (l / 5) / 2) * 2 + 2, x2: (l / 5 + (l / 5) / 2) * 3, y1: (l / 5 + (l / 5) / 2) * 3, y2: (l / 5 + (l / 5) / 2) * 2 + 2, stroke: c2 });
+    svg.appendChild(line5);
+    const line6 = svgDraw("line", { x1: l / 5 + (l / 5) / 2, x2: 2, y1: l - 2, y2: (l / 5 + (l / 5) / 2) * 2 + 2, stroke: c2 });
+    svg.appendChild(line6);
+    const line7 = svgDraw("line", { x1: (l / 5 + (l / 5) / 2) * 2, x2: 2, y1: l - 2, y2: l / 5 + (l / 5) / 2 + 2, stroke: c2 });
+    svg.appendChild(line7);
+    const line8 = svgDraw("line", { x1: l - 2, x2: 2, y1: l - 2, y2: 2, stroke: c2 });
+    svg.appendChild(line8);
+    const line9 = svgDraw("line", { x1: l - 2, x2: l / 5 + (l / 5) / 2 + 2, y1: (l / 5 + (l / 5) / 2) * 2, y2: 2, stroke: c2 });
+    svg.appendChild(line9);
+    const line10 = svgDraw("line", { x1: l - 2, x2: (l / 5 + (l / 5) / 2) * 2 + 2, y1: l / 5 + (l / 5) / 2, y2: 2, stroke: c2 });
+    svg.appendChild(line10);
+    const path1 = svgDraw("path", { d: `M ${l / 2} ${l / 2 - l / 5 + 2} l ${l / 2 - l / 5} ${l / 10} l -${l / 2 - l / 5} ${l / 10} z`, stroke: "rgb(146, 233, 240)", fill: "rgb(130, 210, 255)" });
+    svg.appendChild(path1);
 
     svg.id = `entity_${ind}`;
     arena.gameEntities[row][col].id = ind;
@@ -1166,7 +1190,6 @@ function upDateStats(whatToUpdate) {
         if (arena.charBullets <= 10) app.$bulletsDisplay.style.color = "yellow";
         else if (arena.charBullets <= 5) app.$bulletsDisplay.style.color = "red";
         else app.$bulletsDisplay.style.color = "";
-        console.log(app.$bulletsDisplay.style.color)
     }
     if (whatToUpdate === "direction" || !whatToUpdate) app.$directionDisplay.innerHTML = arena.charDirection;
     if (whatToUpdate === "speed" || !whatToUpdate) app.$speedDisplay.innerHTML = arena.charSpeed;

@@ -14,7 +14,7 @@ const levels =
                 { type: "wallBrick", bluePrint: "13.6.V1.OCOC", colorMode: "brick" },
                 { type: "wallBrick", bluePrint: "14.6.V6.OCCC", colorMode: "brick" },
                 { type: "wallBrick", bluePrint: "13.8.V8.CCOC", colorMode: "brick" },
-                { type: "wallBrick", bluePrint: "8.10.V13.OCOC", colorMode: "brick" },
+                { type: "wallBrick", bluePrint: "8.10.V11.OCCC", colorMode: "brick" },
                 { type: "wallBrick", bluePrint: "7.10.H1.CCOO", colorMode: "brick" },
                 { type: "wallBrick", bluePrint: "7.1.H9.COCC", colorMode: "brick" },
                 { type: "coin", row: 20, col: 0 },
@@ -23,7 +23,7 @@ const levels =
                 { type: "coin", row: 15, col: 7 },
                 { type: "coin", row: 16, col: 7 },
                 { type: "coin", row: 17, col: 7 },
-                { type: "electro", row: 0, col: 0, direction: "right", openCloseInterval: [1, 2.5] },
+                { type: "electro", row: 19, col: 10, direction: "right", openCloseInterval: [1, 2.5] },
             ],
             npcs: [
                 { type: "bug", row: 17, col: 3 }, // not ready yet
