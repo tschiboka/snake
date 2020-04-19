@@ -947,6 +947,7 @@ function drawElectricWall(entity, row, col) {
     const svg = createSvg({ width: w, height: h });
     const c1 = "rgba(255, 255, 255, 0.85)";
     const c2 = "rgba(255, 255, 255, 0.35)";
+    const c3 = "rgb(130, 210, 255)";
 
     rect = svgDraw("rect", { x: 1, y: 1, width: l - 2, height: l - 2, stroke: c1, "stroke-width": 2, fill: "transparent" });
     svg.appendChild(rect);
@@ -970,8 +971,15 @@ function drawElectricWall(entity, row, col) {
     svg.appendChild(line9);
     const line10 = svgDraw("line", { x1: l - 2, x2: (l / 5 + (l / 5) / 2) * 2 + 2, y1: l / 5 + (l / 5) / 2, y2: 2, stroke: c2 });
     svg.appendChild(line10);
-    const path1 = svgDraw("path", { d: `M ${l / 2} ${l / 2 - l / 5 + 2} l ${l / 2 - l / 5} ${l / 10} l -${l / 2 - l / 5} ${l / 10} z`, stroke: "rgb(146, 233, 240)", fill: "rgb(130, 210, 255)" });
-    svg.appendChild(path1);
+
+    let arrowPath;
+    switch (entity.direction) {
+        case "down": { arrowPath = svgDraw("path", { d: `M ${l / 2 - l / 5 + 2} ${l / 2} l ${l / 10} -${l / 2 - l / 5} l ${l / 10} ${l / 2 - l / 5} z`, stroke: c3, fill: c3 }); break; }
+        case "down": { arrowPath = svgDraw("path", { d: `M ${l / 2 - l / 5 + 2} ${l / 2} l ${l / 10} ${l / 2 - l / 5} l ${l / 10} -${l / 2 - l / 5} z`, stroke: c3, fill: c3 }); break; }
+        case "left": { arrowPath = svgDraw("path", { d: `M ${l / 2} ${l / 2 - l / 5 + 2} l -${l / 2 - l / 5} ${l / 10} l ${l / 2 - l / 5} ${l / 10} z`, stroke: c3, fill: c3 }); break; }
+        case "right": { arrowPath = svgDraw("path", { d: `M ${l / 2} ${l / 2 - l / 5 + 2} l ${l / 2 - l / 5} ${l / 10} l -${l / 2 - l / 5} ${l / 10} z`, stroke: c3, fill: c3 }); break; }
+    }
+    svg.appendChild(arrowPath);
 
     svg.id = `entity_${ind}`;
     arena.gameEntities[row][col].id = ind;
