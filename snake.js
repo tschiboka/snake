@@ -31,13 +31,13 @@ const app = {
     $displayTable: undefined,                          // game board that holds character and all game entities (created later)
 
     // APP VARS
+    gameTimer: undefined,                              // (func) -> gameTimer function is declared at every start of a level
     levelPoints: {                                     // (obj)  -> points made of different actions
         coins: 0,                                      //        -> coins collected
         kills: 0,                                      //        -> enemies killed
     },
     totalPoints: [],                                   // (arr)  -> sum of levelPoints objs (from localStorage if any)
     introDuration: 1,                                  // (+int) -> the intro animation in secs
-    loadLevelsState: "pending",                        // ("pending" | "success" | "error") -> if level JSON is loaded
     currentLevel: 1,                                   // (+int) -> default 1 unless local store has level stored
     level: undefined,                                  // (obj)  -> level object is loaded later  
     keyboard: true,                                    // (flag) -> if player can interact with keyboard eg mobile
@@ -83,8 +83,10 @@ const arena = {
             "#c7e2e6", "#9db2b4", "#ade0de", "#a7e1e7", "#86d6d6",
             "#a3baca", "#c9f3f8", "#b0cce6", "#7f8f91", "#97c9c9",
         ]
-    }
-}
+    },
+    electricWallsOpeningTimes: {},                      // (obj of arr)  -> key represents ms till 10000 property is an arr of ids eg {600: [406, 876]} at 600ms open wall id of 406 and 876
+    electricWallsClosingTimes: {},                      // (obj of arr)  -> see above
+};
 
 // PERFORMANCE OPTIMISATION
 let functionTime = [];
@@ -208,6 +210,9 @@ function startLevel() {
     // assign current level to app obj
     app.level = app.levels[app.currentLevel - 1];
 
+    if (app.gameTimer) { clearInterval(app.gameTimer); }
+    startGameTimer();
+    arena.time = -10; // by -10 timer sets a new schedule for entities eg (electric walls)
     arena.charBullets = 20;
     arena.charLife = 100;
     arena.collectedCoins = []; // empty collected coins so they all can be redrawn
@@ -949,8 +954,11 @@ function drawElectricWall(entity, row, col) {
     const c2 = "rgba(255, 255, 255, 0.35)";
     const c3 = "rgb(130, 210, 255)";
 
+    // FRAME
     rect = svgDraw("rect", { x: 1, y: 1, width: l - 2, height: l - 2, stroke: c1, "stroke-width": 2, fill: "transparent" });
     svg.appendChild(rect);
+
+    // DIAGONAL LINES
     const line1 = svgDraw("line", { x1: 2, x2: l / 5 + (l / 5) / 2, y1: l / 5 + (l / 5) / 2, y2: 2, stroke: c2 });
     svg.appendChild(line1);
     const line2 = svgDraw("line", { x1: 2, x2: (l / 5 + (l / 5) / 2) * 2, y1: (l / 5 + (l / 5) / 2) * 2, y2: 2, stroke: c2 });
@@ -972,14 +980,23 @@ function drawElectricWall(entity, row, col) {
     const line10 = svgDraw("line", { x1: l - 2, x2: (l / 5 + (l / 5) / 2) * 2 + 2, y1: l / 5 + (l / 5) / 2, y2: 2, stroke: c2 });
     svg.appendChild(line10);
 
+    // ARROW
     let arrowPath;
     switch (entity.direction) {
-        case "down": { arrowPath = svgDraw("path", { d: `M ${l / 2 - l / 5 + 2} ${l / 2} l ${l / 10} -${l / 2 - l / 5} l ${l / 10} ${l / 2 - l / 5} z`, stroke: c3, fill: c3 }); break; }
+        case "up": { arrowPath = svgDraw("path", { d: `M ${l / 2 - l / 5 + 2} ${l / 2} l ${l / 10} -${l / 2 - l / 5} l ${l / 10} ${l / 2 - l / 5} z`, stroke: c3, fill: c3 }); break; }
         case "down": { arrowPath = svgDraw("path", { d: `M ${l / 2 - l / 5 + 2} ${l / 2} l ${l / 10} ${l / 2 - l / 5} l ${l / 10} -${l / 2 - l / 5} z`, stroke: c3, fill: c3 }); break; }
         case "left": { arrowPath = svgDraw("path", { d: `M ${l / 2} ${l / 2 - l / 5 + 2} l -${l / 2 - l / 5} ${l / 10} l ${l / 2 - l / 5} ${l / 10} z`, stroke: c3, fill: c3 }); break; }
         case "right": { arrowPath = svgDraw("path", { d: `M ${l / 2} ${l / 2 - l / 5 + 2} l ${l / 2 - l / 5} ${l / 10} l -${l / 2 - l / 5} ${l / 10} z`, stroke: c3, fill: c3 }); break; }
     }
     svg.appendChild(arrowPath);
+
+    // ELECTRIC WAVES
+    if (entity.direction === "down") {
+        const rect_ = svgDraw("rect", { x: 0, y: l, width: l, height: l, fill: "red" });
+        rect.id = `entity_${ind}_rect`;
+        svg.appendChild(rect_);
+    }
+
 
     svg.id = `entity_${ind}`;
     arena.gameEntities[row][col].id = ind;
@@ -996,31 +1013,73 @@ function drawElectricWall(entity, row, col) {
 
 
 
-const gameTimer = setInterval(() => {
-    // Circle of actions on board
-    // Character
-    let ms = 0;
-    switch (arena.charSpeed) {
-        case 1: { ms = 240; break; }
-        case 2: { ms = 120; break; }
-        case 3: { ms = 60; break; }
-        case 4: { ms = 40; break; }
-        case 5: { ms = 30; break; }
-    }
+function setElectricWallSchedule() {
+    arena.gameEntities.forEach(row => row.forEach(entity => {
+        if (entity && entity.type === "electro") {
+            let clock = 0;
+            let i = 0;
 
-    if (arena.time % ms === 0) {
-        switch (arena.charDirection) {
-            case "up": { moveCharacter(-1, 0); break; }
-            case "down": { moveCharacter(1, 0); break; }
-            case "left": { moveCharacter(0, -1); break; }
-            case "right": { moveCharacter(0, 1); break; }
+            while (clock <= 10000) {
+                if (!entity.openCloseInterval[i]) i = 0;
+
+                // opening times
+                if (!arena.electricWallsOpeningTimes[clock]) arena.electricWallsOpeningTimes[clock] = [];
+                arena.electricWallsOpeningTimes[clock].push(entity.id);
+                clock += entity.openCloseInterval[i];
+
+                // closing times
+                if (!arena.electricWallsClosingTimes[clock]) arena.electricWallsClosingTimes[clock] = [];
+
+                arena.electricWallsClosingTimes[clock].push(entity.id);
+                clock += entity.openCloseInterval[i + 1];
+
+                i += 2; // every second arr item is opening (0, 2, 4...)
+            }
         }
-    }
+    }));
+}
 
-    arena.time += 10;
-    if (arena.time === 10000) arena.time = 0;
-}, 10);
 
+
+function startGameTimer() {
+    app.gameTimer = setInterval(() => {
+        if (arena.time === -10) {
+            setElectricWallSchedule();
+        }
+
+        // Circle of actions on board (10s)
+        // Character
+        let ms = 0;
+
+        // CHARACTER
+        // character speeds
+        switch (arena.charSpeed) {
+            case 1: { ms = 240; break; }
+            case 2: { ms = 120; break; }
+            case 3: { ms = 60; break; }
+            case 4: { ms = 40; break; }
+            case 5: { ms = 30; break; }
+        }
+
+        // character movements
+        if (arena.time % ms === 0) {
+            switch (arena.charDirection) {
+                case "up": { moveCharacter(-1, 0); break; }
+                case "down": { moveCharacter(1, 0); break; }
+                case "left": { moveCharacter(0, -1); break; }
+                case "right": { moveCharacter(0, 1); break; }
+            }
+        }
+
+        // electric walls toggling
+        if (arena.electricWallsOpeningTimes[arena.time]) openElectricWalls(arena.electricWallsOpeningTimes[arena.time]);
+        if (arena.electricWallsClosingTimes[arena.time]) closeElectricWalls(arena.electricWallsClosingTimes[arena.time]);
+
+        arena.time += 10;
+        if (arena.time >= 10000) arena.time = 0;
+
+    }, 10);
+}
 
 
 function moveCharacter(row, col) {
@@ -1208,4 +1267,16 @@ function upDateStats(whatToUpdate) {
     }
     if (whatToUpdate === "direction" || !whatToUpdate) app.$directionDisplay.innerHTML = arena.charDirection;
     if (whatToUpdate === "speed" || !whatToUpdate) app.$speedDisplay.innerHTML = arena.charSpeed;
+}
+
+
+
+function openElectricWalls(ids) {
+    console.log($(`entity_${ids[0]}_rect`));
+}
+
+
+
+function closeElectricWalls(ids) {
+
 }
