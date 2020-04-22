@@ -56,6 +56,8 @@ const app = {
 const arena = {
     tableRowNum: undefined,                            // (+int) -> the displayable area expressed in table rows (coord)
     tableColNum: undefined,                            // (+int) -> the displayable area expressed in table columns (coord)
+    displayRowsFrom: undefined,                        // (+int) -> the coordinates from where the map is drawn
+    displayColsFrom: undefined,                        //           see above
     gameEntities: undefined,                           // (arr of arr objs) -> row col of objects that appears on the game map
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
@@ -86,6 +88,7 @@ const arena = {
     },
     electricWallsOpeningTimes: {},                      // (obj of arr)  -> key represents ms till 10000 property is an arr of ids eg {600: [406, 876]} at 600ms open wall id of 406 and 876
     electricWallsClosingTimes: {},                      // (obj of arr)  -> see above
+    electricTimers: {},                                 // (ocj of func) -> the interval timer functions key: id property: func
 };
 
 // PERFORMANCE OPTIMISATION
@@ -586,6 +589,7 @@ function drawAllEntitiesOnGameBox() {
 }
 
 
+
 function displayCaracterAndNPCs(entity, id, r, c) {
     switch (entity.type) {
         case "charHead": {
@@ -944,7 +948,6 @@ function drawCoin(row, col) {
 
 
 function drawElectricWall(entity, row, col) {
-    console.log(entity, row, col);
     const ind = row * app.level.dimension.rows + col;
     const l = app.gameTableCellLength + 1;
     const w = entity.direction === "right" || entity.direction === "left" ? l * 2 : l;
@@ -991,10 +994,49 @@ function drawElectricWall(entity, row, col) {
     svg.appendChild(arrowPath);
 
     // ELECTRIC WAVES
+    function createWavePath(dir) {
+        const ran = n => Math.ceil(Math.random() * n);
+        const breakPoints = ran(10);
+        const startPointX = (dir === "down" || dir === "up") ? l / 2 : dir === "left" ? 0 : l;
+        const startPointY = (dir === "left" || dir === "right") ? l / 2 : dir === "up" ? 0 : l;
+        let path = `M ${startPointX} ${startPointY}`;
+        let currX, currY;
+
+        console.log(path);
+        for (let i = 0; i < breakPoints; i++) {
+            switch (dir) {
+                case "down": {
+                    currX = l / 2;
+                    currY = 0;
+                    const ranX = ran((l - currX) / 3);
+                    const ranY = ran((l - currY) / 3);
+                    const ranDir = ran(2) - 1 === 0 ? "-" : "";
+                    path += ` l ${ranDir}${ranX} ${ranY}`;
+                    currX = ranDir === "-" ? currX - ranX : currX + ranX;
+                    currY += ranY;
+                    if (currY >= l) i = breakPoints;
+                    console.log(path);
+                    break;
+                }
+            }
+        }
+        return path;
+    }
+
     if (entity.direction === "down") {
-        const rect_ = svgDraw("rect", { x: 0, y: l, width: l, height: l, fill: "red" });
-        rect.id = `entity_${ind}_rect`;
-        svg.appendChild(rect_);
+        for (let i = 0; i < 20; i++) {
+            const wavePathStr = createWavePath("down");
+            const wavePath = svgDraw("path", {
+                d: wavePathStr,
+                stroke: `rgba(130, 210, 255, ${255 - Math.floor(Math.random() * 200)})`,
+                fill: "transparent",
+                "stroke-width": Math.ceil(Math.random() * 2)
+            });
+            console.log(wavePath);
+            wavePath.id = `entity_${ind}_wave_${i}`;
+            wavePath.style.visibility = "hidden";
+            svg.appendChild(wavePath);
+        }
     }
 
 
@@ -1272,11 +1314,39 @@ function upDateStats(whatToUpdate) {
 
 
 function openElectricWalls(ids) {
-    console.log($(`entity_${ids[0]}_rect`));
+    ids.forEach(id => {
+        const r = Math.floor(id / app.level.dimension.rows);                                                     // the walls position
+        const c = id % app.level.dimension.rows;
+        const dir = arena.gameEntities[r][c].direction;
+        const row = r + (dir === "down" ? 1 : dir === "up" ? -1 : 0);                                            // the electric waves position
+        const col = c + (dir === "right" ? 1 : dir === "left" ? -1 : 0);
+        const inRangeRow = row >= arena.displayRowsFrom && row <= arena.displayRowsFrom + arena.tableRowNum - 1; // is wave in range at all
+        const inRangeCol = col >= arena.displayColsFrom && col <= arena.displayColsFrom + arena.tableColNum - 1;
+        if (inRangeRow && inRangeCol) {
+            arena.electricTimers[id] = setInterval(() => {
+                const ran = () => Math.floor(Math.random() * 20);
+                const ranNums = [ran(), ran(), ran(), ran(), ran(), ran(), ran(), ran(), ran()];
+                $(`#entity_${id}_wave_${ranNums[0]}`).style.visibility = "visible";
+                $(`#entity_${id}_wave_${ranNums[1]}`).style.visibility = "hidden";
+                $(`#entity_${id}_wave_${ranNums[2]}`).style.visibility = "hidden";
+                $(`#entity_${id}_wave_${ranNums[3]}`).style.visibility = "hidden";
+                $(`#entity_${id}_wave_${ranNums[4]}`).style.visibility = "hidden";
+                $(`#entity_${id}_wave_${ranNums[5]}`).style.visibility = "hidden";
+                $(`#entity_${id}_wave_${ranNums[6]}`).style.visibility = "hidden";
+                $(`#entity_${id}_wave_${ranNums[7]}`).style.visibility = "hidden";
+                $(`#entity_${id}_wave_${ranNums[8]}`).style.visibility = "hidden";
+            }, 10);
+        }
+    });
 }
 
 
 
 function closeElectricWalls(ids) {
-
+    ids.forEach(id => {
+        for (let i = 0; i < 20; i++) {
+            $(`#entity_${id}_wave_${i}`).style.visibility = "hidden";
+        }
+        clearTimeout(arena.electricTimers[id]);
+    });
 }

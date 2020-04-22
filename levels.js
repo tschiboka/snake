@@ -23,8 +23,8 @@ const levels =
                 { type: "coin", row: 15, col: 7 },
                 { type: "coin", row: 16, col: 7 },
                 { type: "coin", row: 17, col: 7 },
-                { type: "electro", row: 19, col: 10, direction: "down", openCloseInterval: [100, 500] },
-                { type: "electro", row: 0, col: 0, direction: "down", openCloseInterval: [250, 250, 100, 100] },
+                { type: "electro", row: 19, col: 10, direction: "down", openCloseInterval: [1000, 1000] },
+                { type: "electro", row: 0, col: 0, direction: "down", openCloseInterval: [500, 500] },
             ],
             npcs: [
                 { type: "bug", row: 17, col: 3 }, // not ready yet
