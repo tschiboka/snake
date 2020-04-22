@@ -548,18 +548,15 @@ function placeTableAndCharsOnMap() {
 
                 // clear even if row or col is out of range
                 if (entity.drawMethod === "static") {
-                    app["$entity_" + id].setAttribute("style", `display: none;`);
+                    app["$entity_" + id].style.display = "none";
                 } else { [...app["$entity_" + id].children].forEach(svg => svg.style.display = "none"); }
 
                 // repaint the ones in range
                 if (r >= 0 && c >= 0 && r < arena.tableRowNum && c < arena.tableColNum) {
                     if (entity.drawMethod === "static") {
-                        const newStyle = `
-                            top: ${r * app.gameTableCellLength}px;
-                            left: ${c * app.gameTableCellLength}px;
-                            display: block;
-                        `;
-                        app["$entity_" + id].setAttribute("style", newStyle);
+                        app["$entity_" + id].style.top = `${r * app.gameTableCellLength}px`;
+                        app["$entity_" + id].style.left = `${c * app.gameTableCellLength}px`;
+                        app["$entity_" + id].style.display = "block";
                     } // if static
                     else {
                         displayCaracterAndNPCs(entity, id, r, c);
@@ -985,11 +982,11 @@ function drawElectricWall(entity, row, col) {
 
     // ARROW
     let arrowPath;
-    switch (entity.direction) {
-        case "up": { arrowPath = svgDraw("path", { d: `M ${l / 2 - l / 5 + 2} ${l / 2} l ${l / 10} -${l / 2 - l / 5} l ${l / 10} ${l / 2 - l / 5} z`, stroke: c3, fill: c3 }); break; }
-        case "down": { arrowPath = svgDraw("path", { d: `M ${l / 2 - l / 5 + 2} ${l / 2} l ${l / 10} ${l / 2 - l / 5} l ${l / 10} -${l / 2 - l / 5} z`, stroke: c3, fill: c3 }); break; }
-        case "left": { arrowPath = svgDraw("path", { d: `M ${l / 2} ${l / 2 - l / 5 + 2} l -${l / 2 - l / 5} ${l / 10} l ${l / 2 - l / 5} ${l / 10} z`, stroke: c3, fill: c3 }); break; }
-        case "right": { arrowPath = svgDraw("path", { d: `M ${l / 2} ${l / 2 - l / 5 + 2} l ${l / 2 - l / 5} ${l / 10} l -${l / 2 - l / 5} ${l / 10} z`, stroke: c3, fill: c3 }); break; }
+    if (entity.direction === "up" || entity.direction === "down") {
+        arrowPath = svgDraw("path", { d: `M ${l / 2 - l / 5 + 2} ${l / 2 - 2} l ${l / 10} ${l / 2 - l / 5} l ${l / 10} -${l / 2 - l / 5} z`, stroke: c3, fill: "black", "stroke-width": 2 });
+    }
+    else {
+        arrowPath = svgDraw("path", { d: `M ${l / 2 - 2} ${l / 2 - l / 5 + 2} l ${l / 2 - l / 5} ${l / 10} l -${l / 2 - l / 5} ${l / 10} z`, stroke: c3, fill: "black", "stroke-width": 2 });
     }
     svg.appendChild(arrowPath);
 
@@ -997,52 +994,64 @@ function drawElectricWall(entity, row, col) {
     function createWavePath(dir) {
         const ran = n => Math.ceil(Math.random() * n);
         const breakPoints = ran(10);
-        const startPointX = (dir === "down" || dir === "up") ? l / 2 : dir === "left" ? 0 : l;
-        const startPointY = (dir === "left" || dir === "right") ? l / 2 : dir === "up" ? 0 : l;
+        const startPointX = (dir === "down" || dir === "up") ? l / 2 : l;
+        const startPointY = (dir === "left" || dir === "right") ? l / 2 : l;
         let path = `M ${startPointX} ${startPointY}`;
         let currX, currY;
 
-        console.log(path);
         for (let i = 0; i < breakPoints; i++) {
-            switch (dir) {
-                case "down": {
-                    currX = l / 2;
-                    currY = 0;
-                    const ranX = ran((l - currX) / 3);
-                    const ranY = ran((l - currY) / 3);
-                    const ranDir = ran(2) - 1 === 0 ? "-" : "";
-                    path += ` l ${ranDir}${ranX} ${ranY}`;
-                    currX = ranDir === "-" ? currX - ranX : currX + ranX;
-                    currY += ranY;
-                    if (currY >= l) i = breakPoints;
-                    console.log(path);
-                    break;
-                }
+            if (dir === "down" || dir === "up") {
+                currX = l / 2;
+                currY = 0;
+                const ranX = ran((l - currX) / 4);
+                const ranY = ran((l - currY) / 4);
+                const ranDir = ran(2) - 1 === 0 ? "-" : "";
+                path += ` l ${ranDir}${ranX} ${ranY}`;
+                currX = ranDir === "-" ? currX - ranX : currX + ranX;
+                currY += ranY;
+                if (currY >= l) break;
+            } else {
+                currX = 0;
+                currY = l / 2;
+                const ranX = ran((l - currX) / 4);
+                const ranY = ran((l - currY) / 4);
+                const ranDir = ran(2) - 1 === 0 ? "-" : "";
+                path += ` l ${ranX} ${ranDir}${ranY}`;
+                currX += ranX;
+                currY = ranDir === "-" ? currY - ranY : currY + ranY;
+                if (currX >= l) break;
             }
         }
         return path;
     }
 
-    if (entity.direction === "down") {
-        for (let i = 0; i < 20; i++) {
-            const wavePathStr = createWavePath("down");
-            const wavePath = svgDraw("path", {
-                d: wavePathStr,
-                stroke: `rgba(130, 210, 255, ${255 - Math.floor(Math.random() * 200)})`,
-                fill: "transparent",
-                "stroke-width": Math.ceil(Math.random() * 2)
-            });
-            console.log(wavePath);
-            wavePath.id = `entity_${ind}_wave_${i}`;
-            wavePath.style.visibility = "hidden";
-            svg.appendChild(wavePath);
-        }
+    for (let i = 0; i < 20; i++) {
+        const wavePathStr = createWavePath(entity.direction);
+        const ranOpacity = 1 - (Math.floor(Math.random() * 50) / 100);
+        const ranStrokeWidth = Math.ceil(Math.random() * 6) / 2;
+        const wavePath = svgDraw("path", {
+            d: wavePathStr,
+            stroke: `rgba(130, 210, 255, ${ranOpacity})`,
+            fill: "transparent",
+            "stroke-width": ranStrokeWidth
+        });
+        wavePath.id = `entity_${ind}_wave_${i}`;
+        wavePath.style.visibility = "hidden";
+        svg.appendChild(wavePath);
     }
 
 
     svg.id = `entity_${ind}`;
     arena.gameEntities[row][col].id = ind;
     svg.setAttribute("style", `display: none;`);
+    if (entity.direction === "up") {
+        svg.style.transform = `rotate(180deg) translateY(${l}px)`;
+        svg.style.WebkitTransform = `rotate(180deg) translateY(${l}px)`;
+    }
+    if (entity.direction === "left") {
+        svg.style.transform = `rotate(180deg) translateX(${l}px`;
+        svg.style.WebkitTransform = `rotate(180deg) translateX(${l}px`;
+    }
     app[`$entity_${ind}`] = svg;
     app.$entityBox.appendChild(svg);
 }
@@ -1325,17 +1334,11 @@ function openElectricWalls(ids) {
         if (inRangeRow && inRangeCol) {
             arena.electricTimers[id] = setInterval(() => {
                 const ran = () => Math.floor(Math.random() * 20);
-                const ranNums = [ran(), ran(), ran(), ran(), ran(), ran(), ran(), ran(), ran()];
-                $(`#entity_${id}_wave_${ranNums[0]}`).style.visibility = "visible";
-                $(`#entity_${id}_wave_${ranNums[1]}`).style.visibility = "hidden";
-                $(`#entity_${id}_wave_${ranNums[2]}`).style.visibility = "hidden";
-                $(`#entity_${id}_wave_${ranNums[3]}`).style.visibility = "hidden";
-                $(`#entity_${id}_wave_${ranNums[4]}`).style.visibility = "hidden";
-                $(`#entity_${id}_wave_${ranNums[5]}`).style.visibility = "hidden";
-                $(`#entity_${id}_wave_${ranNums[6]}`).style.visibility = "hidden";
-                $(`#entity_${id}_wave_${ranNums[7]}`).style.visibility = "hidden";
-                $(`#entity_${id}_wave_${ranNums[8]}`).style.visibility = "hidden";
-            }, 10);
+                $(`#entity_${id}_wave_${ran(20)}`).style.visibility = "visible";
+                for (let i = 0; i < 19; i++) {
+                    $(`#entity_${id}_wave_${ran(20)}`).style.visibility = "hidden";
+                }
+            }, 50);
         }
     });
 }

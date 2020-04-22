@@ -24,7 +24,10 @@ const levels =
                 { type: "coin", row: 16, col: 7 },
                 { type: "coin", row: 17, col: 7 },
                 { type: "electro", row: 19, col: 10, direction: "down", openCloseInterval: [1000, 1000] },
-                { type: "electro", row: 0, col: 0, direction: "down", openCloseInterval: [500, 500] },
+                { type: "electro", row: 2, col: 2, direction: "up", openCloseInterval: [500, 500] },
+                { type: "electro", row: 3, col: 1, direction: "left", openCloseInterval: [1500, 2500] },
+                { type: "electro", row: 3, col: 3, direction: "right", openCloseInterval: [1500, 2000] },
+                { type: "electro", row: 4, col: 2, direction: "down", openCloseInterval: [500, 200] },
             ],
             npcs: [
                 { type: "bug", row: 17, col: 3 }, // not ready yet
