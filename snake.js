@@ -58,6 +58,7 @@ const arena = {
     tableColNum: undefined,                            // (+int) -> the displayable area expressed in table columns (coord)
     displayRowsFrom: undefined,                        // (+int) -> the coordinates from where the map is drawn
     displayColsFrom: undefined,                        //           see above
+    gameCharacterCoords: undefined,                    // (arr)  -> char current row and col
     gameEntities: undefined,                           // (arr of arr objs) -> row col of objects that appears on the game map
     parallaxCoefficient: 5,                            // (+int) -> game table background moves slower than the char (px)
     parralaxCenterRowCol: [0, 0],                      // (arr)  -> row and col of the center of the parallax bg when table is built
@@ -88,9 +89,9 @@ const arena = {
             "#a3baca", "#c9f3f8", "#b0cce6", "#7f8f91", "#97c9c9",
         ]
     },
-    electricWallsOpeningTimes: {},                      // (obj of arr)  -> key represents ms till 10000 property is an arr of ids eg {600: [406, 876]} at 600ms open wall id of 406 and 876
-    electricWallsClosingTimes: {},                      // (obj of arr)  -> see above
-    electricTimers: {},                                 // (ocj of func) -> the interval timer functions key: id property: func
+    electricWallsOpeningTimes: {},                     // (obj of arr)  -> key represents ms till 10000 property is an arr of ids eg {600: [406, 876]} at 600ms open wall id of 406 and 876
+    electricWallsClosingTimes: {},                     // (obj of arr)  -> see above
+    electricWallTimers: {},                            // (ocj of func) -> the interval timer functions key: id property: func
 };
 
 // PERFORMANCE OPTIMISATION
@@ -220,6 +221,7 @@ function startLevel() {
     arena.time = -10; // by -10 timer sets a new schedule for entities eg (electric walls)
     arena.charBullets = 20;
     arena.charLife = 100;
+    arena.charIsHurt = false;
     arena.collectedCoins = []; // empty collected coins so they all can be redrawn
     arena.charDirection = app.levels[app.currentLevel - 1].gameCharacterDirection;
     upDateStats();
@@ -260,6 +262,7 @@ function buildGameArenaEntitiesObject(obj) {
         return true;
     }
 
+    arena.gameCharacterCoords = app.level.gameCharacterCoords;
 
     // check if game character has all properties set properly and build them into game entities
     if (!app.level.gameCharacterCoords) throw new Error("Levels gameCharacterCoords property has not been defined! " + JSON.stringify(app.level));
@@ -486,7 +489,7 @@ function buildGameTableArea() {
     arena.gameEntities = buildGameArenaEntitiesObject(app.level.objects);
 
     drawAllEntitiesOnGameBox(app.level.objects);
-    drawCharacterSkins(app.level.gameCharacterCoords);
+    drawCharacterSkins(arena.gameCharacterCoords);
 
     arena.charDirection = arena.charDirection || app.level.gameCharacterDirection;
     app.gameTableIsDrawn = true;
@@ -601,7 +604,7 @@ function displayCaracterAndNPCs(entity, id, r, c) {
         }
         case "charBody": {
             const bodyInd = entity.index;
-            const [prev, curr, next] = [app.level.gameCharacterCoords[bodyInd - 1], app.level.gameCharacterCoords[bodyInd], app.level.gameCharacterCoords[bodyInd + 1]];
+            const [prev, curr, next] = [arena.gameCharacterCoords[bodyInd - 1], arena.gameCharacterCoords[bodyInd], arena.gameCharacterCoords[bodyInd + 1]];
 
             let jointType = undefined;
             if (prev[0] === curr[0] && curr[0] === next[0]) jointType = "body_hor_str";
@@ -623,7 +626,7 @@ function displayCaracterAndNPCs(entity, id, r, c) {
         }
         case "charTail": {
             const tailInd = entity.index;
-            const [prev, curr] = [app.level.gameCharacterCoords[tailInd - 1], app.level.gameCharacterCoords[tailInd]];
+            const [prev, curr] = [arena.gameCharacterCoords[tailInd - 1], arena.gameCharacterCoords[tailInd]];
             let jointType = undefined;
             if (prev[0] < curr[0]) jointType = "tail_from_N";
             if (prev[0] > curr[0]) jointType = "tail_from_S";
@@ -1178,7 +1181,7 @@ function moveCharacter(row, col) {
     characterCoords.forEach(coords => arena.gameEntities[coords[0]][coords[1]] = undefined);
     characterCoords.unshift([headCoord[0] + row, headCoord[1] + col]);
     characterCoords.pop();
-    app.level.gameCharacterCoords = characterCoords;
+    arena.gameCharacterCoords = characterCoords;
 
 
     // assign new items to corrisponding arr slots
@@ -1192,7 +1195,7 @@ function moveCharacter(row, col) {
 function shoot() {
     if (arena.charBullets <= 0) return void (0);
 
-    const headRC = app.level.gameCharacterCoords[0];
+    const headRC = arena.gameCharacterCoords[0];
     const direction = arena.charDirection;
 
     // don't shoot when by the edges of display table
@@ -1335,7 +1338,7 @@ function openElectricWalls(ids) {
         const inRangeRow = row >= arena.displayRowsFrom && row <= arena.displayRowsFrom + arena.tableRowNum - 1; // is wave in range at all
         const inRangeCol = col >= arena.displayColsFrom && col <= arena.displayColsFrom + arena.tableColNum - 1;
         if (inRangeRow && inRangeCol) {
-            arena.electricTimers[id] = setInterval(() => {
+            arena.electricWallTimers[id] = setInterval(() => {
                 const ran = () => Math.floor(Math.random() * 20);
 
                 $(`#entity_${id}_wave_${ran(20)}`).style.visibility = "visible";
@@ -1384,7 +1387,7 @@ function closeElectricWalls(ids) {
             $(`#entity_${id}_wave_${i}`).style.visibility = "hidden";
         }
 
-        clearTimeout(arena.electricTimers[id]);
+        clearTimeout(arena.electricWallTimers[id]);
     });
 }
 
@@ -1405,4 +1408,32 @@ function paintHurtChar(isHurt) {
 
 function gameOver() {
     console.log("GAME OVER");
+    endLevel();
+}
+
+
+
+function endLevel() {
+    app.$mainMenu.style.display = "flex";
+    app.$game.style.display = "none";
+
+    // clear all Timeouts
+    let timeoutIds = window.setTimeout(() => { }, 0);
+    while (timeoutIds--) { clearTimeout(timeoutIds); }
+
+    // clear all Intervals
+    let intervalIds = window.setInterval(() => { }, 0);
+    while (intervalIds--) { clearInterval(intervalIds); }
+
+    // reset vars
+    arena.electricWallsOpeningTimes = {};
+    arena.electricWallsClosingTimes = {};
+    arena.electricWallTimers = {};
+    arena.gameEntities = undefined;
+    console.log(arena.gameCharacterCoords)
+    arena.gameCharacterCoords = undefined;
+
+    app.$gameBox.innerHTML = "";
+
+    paintHurtChar(false);
 }
