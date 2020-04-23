@@ -262,13 +262,13 @@ function buildGameArenaEntitiesObject(obj) {
         return true;
     }
 
-    arena.gameCharacterCoords = app.level.gameCharacterCoords;
+    if (!arena.gameCharacterCoords) arena.gameCharacterCoords = app.level.gameCharacterCoords;
 
     // check if game character has all properties set properly and build them into game entities
-    if (!app.level.gameCharacterCoords) throw new Error("Levels gameCharacterCoords property has not been defined! " + JSON.stringify(app.level));
-    if (!Array.isArray(app.level.gameCharacterCoords)) throw new Error("Levels gameCharacterCoords property most be an array " + app.level.gameCharacterCoords);
-    if (app.level.gameCharacterCoords.length < 4) throw new Error("Levels gameCharacterCoords property must have at least 4 items! Only found " + app.level.gameCharacterCoords.length + ".");
-    app.level.gameCharacterCoords.forEach((coord, i, coordArr) => {
+    if (!arena.gameCharacterCoords) throw new Error("Levels gameCharacterCoords property has not been defined! " + JSON.stringify(app.level));
+    if (!Array.isArray(arena.gameCharacterCoords)) throw new Error("Levels gameCharacterCoords property most be an array " + arena.gameCharacterCoords);
+    if (arena.gameCharacterCoords.length < 4) throw new Error("Levels gameCharacterCoords property must have at least 4 items! Only found " + arena.gameCharacterCoords.length + ".");
+    arena.gameCharacterCoords.forEach((coord, i, coordArr) => {
         if (!Array.isArray(coord)) throw new Error("Levels gameCharacter properties items must be all arrays! " + coord);
         if (coord.length !== 2) throw new Error("Game characters coordinates must have 2 items!", + coord);
         if (isNaN(parseInt(coord[0])) || isNaN(parseInt(coord[1]))) throw new Error("Game characters coordinate must be a number! " + coord);
@@ -288,7 +288,7 @@ function buildGameArenaEntitiesObject(obj) {
         }
 
         entities[coord[0]][coord[1]] = {
-            type: (i === 0 ? "charHead" : i === app.level.gameCharacterCoords.length - 1 ? "charTail" : "charBody"),
+            type: (i === 0 ? "charHead" : i === arena.gameCharacterCoords.length - 1 ? "charTail" : "charBody"),
             drawMethod: "dinamic", // char can look differently by every redraw
             skins: [], // the possible skins
             blocking: { char: true, bullet: true }, // if objects is interacting with characters or bullets
@@ -550,6 +550,7 @@ function placeTableAndCharsOnMap() {
             if (arena.gameEntities[rowOnMap] && arena.gameEntities[rowOnMap][colOnMap]) {
                 const entity = arena.gameEntities[rowOnMap][colOnMap];
                 const id = entity.id;
+                if (arena.charIsShooting) console.log(id);
 
                 // clear even if row or col is out of range
                 if (entity.drawMethod === "static") {
@@ -685,7 +686,7 @@ function drawCharacterSkins(coords) {
         const skinBox = document.createElement("div");
         skinBox.setAttribute("style", `width: ${l}px; height: ${l}px;`);
 
-        const ind = ch[0] * app.level.dimension.rows + ch[1];
+        const ind = ch[0] * app.level.dimension.cols + ch[1];
         skinBox.id = `entity_${ind}`;
         skinBox.classList.add("charSkin");
         arena.gameEntities[ch[0]][ch[1]].id = ind;
@@ -909,7 +910,7 @@ function drawWall(entity, row, col) {
         svg.appendChild(line4);
     }
 
-    const ind = row * app.level.dimension.rows + col;
+    const ind = row * app.level.dimension.cols + col;
     svg.id = `entity_${ind}`;
     arena.gameEntities[row][col].id = ind;
     svg.setAttribute("style", `display: none;`);
@@ -920,7 +921,7 @@ function drawWall(entity, row, col) {
 
 
 function drawCoin(row, col) {
-    const ind = row * app.level.dimension.rows + col;
+    const ind = row * app.level.dimension.cols + col;
     const l = app.gameTableCellLength + 1;
     const svg = createSvg({ width: l, height: l });
     const c1 = "#fcbe52";
@@ -951,7 +952,7 @@ function drawCoin(row, col) {
 
 
 function drawElectricWall(entity, row, col) {
-    const ind = row * app.level.dimension.rows + col;
+    const ind = row * app.level.dimension.cols + col;
     const l = app.gameTableCellLength + 1;
     const w = entity.direction === "right" || entity.direction === "left" ? l * 2 : l;
     const h = entity.direction === "up" || entity.direction === "down" ? l * 2 : l;
@@ -1330,8 +1331,8 @@ function upDateStats(whatToUpdate) {
 
 function openElectricWalls(ids) {
     ids.forEach(id => {
-        const r = Math.floor(id / app.level.dimension.rows);                                                     // the walls position
-        const c = id % app.level.dimension.rows;
+        const r = Math.floor(id / app.level.dimension.cols);                                                     // the walls position
+        const c = id % app.level.dimension.cols;
         const dir = arena.gameEntities[r][c].direction;
         const row = r + (dir === "down" ? 1 : dir === "up" ? -1 : 0);                                            // the electric waves position
         const col = c + (dir === "right" ? 1 : dir === "left" ? -1 : 0);
@@ -1430,8 +1431,13 @@ function endLevel() {
     arena.electricWallsClosingTimes = {};
     arena.electricWallTimers = {};
     arena.gameEntities = undefined;
-    console.log(arena.gameCharacterCoords)
     arena.gameCharacterCoords = undefined;
+    arena.gameCharacterCoords = undefined;
+    arena.charBullets = 20;
+    arena.charIsShooting = false;
+    arena.time = 0;
+    app.levelPoints.coins = 0;
+    app.levelPoints.kills = 0;
 
     app.$gameBox.innerHTML = "";
 
