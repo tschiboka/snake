@@ -67,6 +67,8 @@ const arena = {
     charLife: 100,                                     // (+int) -> life is expressed in percentage (0% death)
     charBullets: 0,                                    // (+int) -> bullets loads from localStorage
     charIsShooting: false,                             // (flag) -> one bullet is shot a time
+    charIsHurt: false,                                 // (flag) -> char is red for a couple of secs when its hurt
+    isHurtTimer: undefined,                            // (func) -> timer will be accessed from different function calls
     time: 0,                                           // (+int) -> time that being incremented and triggers char and entitys move
     brickColorSequence: {
         brick: [                                       // (obj of arr of str)  -> colors of random individual brick colors
@@ -682,6 +684,7 @@ function drawCharacterSkins(coords) {
 
         const ind = ch[0] * app.level.dimension.rows + ch[1];
         skinBox.id = `entity_${ind}`;
+        skinBox.classList.add("charSkin");
         arena.gameEntities[ch[0]][ch[1]].id = ind;
 
         // HEAD
@@ -1309,7 +1312,7 @@ function upDateStats(whatToUpdate) {
     // if what to update is not specified update all
     if (whatToUpdate === "level" || !whatToUpdate) app.$levelDisplay.innerHTML = app.currentLevel;
     if (whatToUpdate === "points" || !whatToUpdate) app.$pointDisplay.innerHTML = app.levelPoints.coins * 10; // changes!!!!!!!!!!!!
-    if (whatToUpdate === "life" || !whatToUpdate) app.$lifeDisplay.innerHTML = arena.charLife;
+    if (whatToUpdate === "life" || !whatToUpdate) app.$lifeDisplay.innerHTML = arena.charLife + "%";
     if (whatToUpdate === "bullets" || !whatToUpdate) {
         app.$bulletsDisplay.innerHTML = arena.charBullets;
         if (arena.charBullets <= 10) app.$bulletsDisplay.style.color = "yellow";
@@ -1334,9 +1337,39 @@ function openElectricWalls(ids) {
         if (inRangeRow && inRangeCol) {
             arena.electricTimers[id] = setInterval(() => {
                 const ran = () => Math.floor(Math.random() * 20);
+
                 $(`#entity_${id}_wave_${ran(20)}`).style.visibility = "visible";
+
                 for (let i = 0; i < 19; i++) {
                     $(`#entity_${id}_wave_${ran(20)}`).style.visibility = "hidden";
+                }
+
+                // check if electric waves has character under them
+                if (arena.gameEntities[row][col]) {
+                    const type = arena.gameEntities[row][col].type;
+
+                    if (type === "charHead" || type === "charBody" || type === "charTail") {
+                        const hurtFunc = () => {
+                            arena.charIsHurt = false;
+                            paintHurtChar(false);
+                            clearTimeout(arena.isHurtTimer);
+                        }
+
+                        arena.charLife--;
+
+                        if (arena.charLife <= 0) gameOver();
+                        else if (!arena.charIsHurt) {
+                            arena.charIsHurt = "true";
+                            paintHurtChar(true);
+                            arena.isHurtTimer = setTimeout(hurtFunc, 2000);
+                        }
+                        else {
+                            clearTimeout(arena.isHurtTimer);
+                            arena.isHurtTimer = setTimeout(hurtFunc, 2000);
+                        }
+
+                        upDateStats("life");
+                    }
                 }
             }, 50);
         }
@@ -1350,6 +1383,26 @@ function closeElectricWalls(ids) {
         for (let i = 0; i < 20; i++) {
             $(`#entity_${id}_wave_${i}`).style.visibility = "hidden";
         }
+
         clearTimeout(arena.electricTimers[id]);
     });
+}
+
+
+
+function paintHurtChar(isHurt) {
+    const paths = $(".charSkin > svg > path", true);
+    const fillColor = isHurt ? "rgba(250, 20, 79, 0.35)" : "rgba(128, 255, 217, 0.35)";
+    const strokeColor = isHurt ? "rgb(250, 20, 79)" : "rgb(128, 255, 217)";
+
+    paths.forEach(path => {
+        path.setAttributeNS(null, "fill", fillColor);
+        path.setAttributeNS(null, "stroke", strokeColor);
+    });
+}
+
+
+
+function gameOver() {
+    console.log("GAME OVER");
 }
